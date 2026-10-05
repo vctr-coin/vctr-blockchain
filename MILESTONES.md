@@ -95,11 +95,12 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 ## Testing versus production
 
-| Stage | Network/assets | What it demonstrates |
-|---|---|---|
-| Local | Temporary local chain and generated test wallets | Contract logic and repeatable walkthrough; no persistent chain state or real funds |
-| Public test | Ethereum Sepolia test ETH and test VCTR (completed); Base Sepolia rehearsal waived | Public EVM deployment/contract behavior; does not rehearse Base RPC/explorer behavior, market demand, or provide a production security guarantee |
-| Production | Base Mainnet and real ETH | Real contract deployment and real user transactions; fees and mistakes are real and irreversible |
+| Stage | Status | Network/assets | What it demonstrates |
+|---|---|---|---|
+| Local | OK | Temporary local chain and generated test wallets | Contract logic and repeatable walkthrough; no persistent chain state or real funds |
+| Public test: Ethereum Sepolia | OK | Ethereum Sepolia test ETH and test VCTR | Public test deployment and contract behavior completed and read-only verified. |
+| Base Sepolia rehearsal | Pending | Base Sepolia test ETH | Waived at the user's direction; Base-specific RPC/explorer behavior remains untested. The gap is accepted and is not a launch gate unless that decision changes. |
+| Production | Pending | Base Mainnet and real ETH | No production deployment yet. Real contract deployment and user transactions; fees and mistakes are real and irreversible. |
 
 ## Cost categories
 

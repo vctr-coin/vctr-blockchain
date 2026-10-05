@@ -76,15 +76,21 @@ forge test
 
 The invariant suite fuzzes transfers, delegated transfers, time advances, and lock claims, checking supply and balance conservation and the release schedules. The configured campaign uses 128 runs at depth 128. Tests are evidence about the tested code and scenarios; they are not a substitute for an independent security audit or a guarantee against unknown defects.
 
-## Security and launch checklist
+## Base Mainnet go-live status
 
-Before any Base Mainnet deployment:
-
-1. Complete and document an independent review of the exact source, compiler settings, constructor arguments, and deployment procedure. The [security review request](SECURITY_REVIEW_REQUEST.md) describes the requested scope.
-2. Resolve or explicitly accept review findings and bind approval to the exact clean Git commit used for deployment.
-3. Reconfirm all six recipient addresses using a trusted, independent channel. Addresses are permanent once deployed.
-4. Review live gas estimates and fund only the dedicated deployment account with the amount required for deployment.
-5. Deploy only after the review and operational checks are complete; then run the read-only verifier and verify the source on BaseScan.
-6. Publish the final Mainnet address, transaction, verified source, allocation details, lock schedules, and material risks. Do not imply that testnet tokens have value or that unsold sale allocations were sold or distributed.
+| Launch item | Status | Details |
+| --- | --- | --- |
+| Token code, fixed supply, and allocation locks | OK | Compiled and locally tested; the contracts have no owner, mint, pause, blacklist, or upgrade path. |
+| Deployment wallet addresses | OK | The user confirmed the final wallet inputs. Recheck the exact six addresses displayed by the deployment helper before the irreversible transaction. |
+| Local automated tests | OK | Eleven Node tests pass, and the Foundry invariant campaign was previously run with 128 runs at depth 128. Testing does not replace an independent audit. |
+| Ethereum Sepolia deployment and verification | OK | Public test deployment passed read-only checks. This does not test Base-specific RPC or explorer behavior. |
+| Base Sepolia rehearsal | Pending | Waived at the user's direction. The Base-specific testnet path remains unrehearsed; this gap is currently accepted and is not a go-live gate unless the decision changes. |
+| Independent human security review | Pending | No independent human audit is complete. The FirePan free surface scan is automated triage, not an audit. Review the exact source and deployment setup using the [security review request](SECURITY_REVIEW_REQUEST.md); resolve or explicitly accept findings. |
+| Reviewed release commit | Pending | After review and fixes, approve the exact clean Git commit and set `BASE_MAINNET_APPROVED_COMMIT` to its full hash. |
+| Dedicated Mainnet deployer and Base ETH | Pending | Configure `BASE_MAINNET_DEPLOYER_PRIVATE_KEY` locally and fund the dedicated deployer with enough Base ETH for the live deployment estimate. The helper has a default Base RPC; `BASE_MAINNET_RPC` can override it. Keep the key out of source control and chat. |
+| Base Mainnet deployment | Pending | Not deployed. Submit only after the review and release gates are complete, the live gas estimate is acceptable, and the helper's address, network, and irreversible-deployment confirmations are checked. |
+| Post-deployment checks and publication | Pending | Run `npm run verify:base-mainnet`, verify token and child-contract sources on BaseScan, and publish the final addresses, transaction, allocation, locks, and risk disclosures. |
+| Trading-pool liquidity | OK | Not required to deploy the token. The 1 billion VCTR allocation remains assigned to the reserve wallet; any pool funding is a separate optional decision. No INR liquidity budget is set. |
+| Direct-sale terms and public sale disclosures | Pending | Publish accurate terms before selling any tokens. Do not imply unsold tokens were sold or distributed, or promise price, profit, or adoption. |
 
 There is no Mainnet deployment yet. Independent review and the Base-specific testnet rehearsal remain outstanding; the latter was explicitly waived. Liquidity decisions, sale terms, and any future AI-agent services are separate from deploying the token and must be documented independently. The optional `local_tool` FastAPI app is an arithmetic-only allocation checker; it does not connect to a blockchain or affect contract behavior.
