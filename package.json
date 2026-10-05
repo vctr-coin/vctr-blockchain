@@ -1,0 +1,19 @@
+{
+  "name": "vctr-token-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "compile:contracts": "node scripts/compile.mjs",
+    "test:evm": "node --test tests/evm.test.mjs",
+    "test:foundry": "forge test",
+    "deploy:sepolia": "node scripts/deploy-sepolia.mjs",
+    "deploy:ethereum-sepolia": "DEPLOY_NETWORK=ethereum-sepolia node scripts/deploy-sepolia.mjs",
+    "verify:ethereum-sepolia": "node scripts/verify-ethereum-sepolia.mjs"
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "5.7.0",
+    "ethers": "6.15.0",
+    "ganache": "7.9.2",
+    "solc": "0.8.30"
+  }
+}

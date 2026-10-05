@@ -1,0 +1,88 @@
+{
+  "name": "VCTR AI Token",
+  "symbol": "VCTR",
+  "total_supply_tokens": "10000000000",
+  "decimals": 18,
+  "allocations": [
+    {
+      "name": "Founder lock",
+      "percentage": "30",
+      "amount_tokens": "3000000000",
+      "destination_wallet": "Vesting contract deployed at token launch",
+      "beneficiary_wallet": "0x411A15118FABE788B285EEEeD0Ee0192076f2603",
+      "rule_now": "Held under the separately published founder-lock rules."
+    },
+    {
+      "name": "Liquidity",
+      "percentage": "10",
+      "amount_tokens": "1000000000",
+      "destination_wallet": "0x8A4d5a891172EE81a3eb60343A5D15847c19aBDF",
+      "rule_now": "Only the amount actually needed for the initial pool may be deposited. Keep the rest in a separate liquidity-reserve wallet."
+    },
+    {
+      "name": "Direct sales",
+      "percentage": "30",
+      "amount_tokens": "3000000000",
+      "destination_wallet": "0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc",
+      "rule_now": "Held in the Seller wallet. Publish the sale terms before selling; do not describe unsold tokens as sold or distributed."
+    },
+    {
+      "name": "Community and ecosystem",
+      "percentage": "5",
+      "amount_tokens": "500000000",
+      "destination_wallet": "0xBffb8991e22FC38bAD6Bd3b553B9a457B36b09c1",
+      "rule_now": "Locked on-chain in a separate immutable timelock. No claim or transfers before 3 fixed 365-day years from token deployment; the named beneficiary can claim the full allocation after the cliff."
+    },
+    {
+      "name": "Project treasury",
+      "percentage": "10",
+      "amount_tokens": "1000000000",
+      "destination_wallet": "0x822b4D5711740A3Ee3d1F30C3Eeb06b794537767",
+      "rule_now": "Locked on-chain in a separate immutable timelock. No claim or transfers before 3 fixed 365-day years from token deployment; the named beneficiary can claim the full allocation after the cliff. Tokens are not operating cash."
+    },
+    {
+      "name": "Social causes",
+      "percentage": "15",
+      "amount_tokens": "1500000000",
+      "destination_wallet": "0x3201B47e29c5d49f801D3a760caCA74e462BfaA2",
+      "rule_now": "Locked on-chain in a separate immutable timelock. No claim or transfers before 3 fixed 365-day years from token deployment; the named beneficiary can claim the full allocation after the cliff. Do not claim a rupee or dollar donation value for these tokens."
+    }
+  ],
+  "founder_lock_rules": {
+    "locked_amount_tokens": "3000000000",
+    "custody": "All founder tokens are sent to a vesting contract at token launch; the beneficiary wallet receives only released tokens.",
+    "cliff_years": 15,
+    "vesting_years_after_cliff": 5,
+    "approximate_monthly_release_tokens": "50000000",
+    "early_release": false,
+    "start": "The token deployment block timestamp, recorded immutably in the vesting contract.",
+    "schedule_detail": "No release during the first 15 fixed 365-day years. Then continuous linear vesting for 5 fixed 365-day years. At the 20-year point the full 3 billion is vested. The beneficiary claims vested amounts; unclaimed vested tokens may be claimed together.",
+    "publication_requirements": [
+      "vesting contract address",
+      "beneficiary address",
+      "start date",
+      "release schedule"
+    ]
+  },
+  "three_year_allocation_locks": {
+    "locked_amount_tokens": "3000000000",
+    "allocations": [
+      "Community and ecosystem",
+      "Project treasury",
+      "Social causes"
+    ],
+    "cliff_years": 3,
+    "year_basis": "fixed 365-day years",
+    "start": "The token deployment block timestamp.",
+    "release": "After the 3-year cliff, each named beneficiary may claim its full allocation from its separate immutable timelock. No admin or early release exists."
+  },
+  "liquidity_budget": {
+    "amount_inr": "5000",
+    "status": "tentative_at_risk_capital",
+    "reconfirm_before_pool_deployment": true,
+    "mainnet_vctr_pool_amount": null,
+    "note": "This is a tentative rupee budget, not an approved deposit or a fixed VCTR amount. Reconfirm the budget and pool parameters at actual Base Mainnet pool deployment."
+  },
+  "status": "draft_tokenomics_wallets_and_vesting_schedule_recorded_review_pending",
+  "wallet_address_note": "The user reports verifying all six supplied addresses against their intended MetaMask accounts. Recheck the exact constructor values at deployment; deployed token allocation destinations cannot be changed."
+}

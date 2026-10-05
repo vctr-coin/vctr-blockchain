@@ -1,0 +1,43 @@
+{
+  "network": "Ethereum Sepolia",
+  "chain_id": 11155111,
+  "token_address": "0xB43557D42e54875D1526A35317727dE338dfD2ee",
+  "vesting_contract_address": "0x766161f7fcA3971a106374f975e5Cb918F17fE86",
+  "founder_beneficiary": "0x411A15118FABE788B285EEEeD0Ee0192076f2603",
+  "start_timestamp": 1791206508,
+  "start_date_utc": "2026-10-05T13:21:48.000Z",
+  "allocation_locks": {
+    "Community and Ecosystem": {
+      "contract_address": "0x1BA8F451DF9AbbA4CC6fB96F2b44Cd685604996B",
+      "beneficiary": "0xBffb8991e22FC38bAD6Bd3b553B9a457B36b09c1",
+      "amount_tokens": "500000000.0",
+      "unlock_timestamp": 1885814508,
+      "unlock_date_utc": "2029-10-04T13:21:48.000Z"
+    },
+    "Project Treasury": {
+      "contract_address": "0x74cF4Ae83B5228d36f3e304D5378f28931DC215A",
+      "beneficiary": "0x822b4D5711740A3Ee3d1F30C3Eeb06b794537767",
+      "amount_tokens": "1000000000.0",
+      "unlock_timestamp": 1885814508,
+      "unlock_date_utc": "2029-10-04T13:21:48.000Z"
+    },
+    "Social Causes": {
+      "contract_address": "0x370be11225f91f3bec0D915436978D618b699a7a",
+      "beneficiary": "0x3201B47e29c5d49f801D3a760caCA74e462BfaA2",
+      "amount_tokens": "1500000000.0",
+      "unlock_timestamp": 1885814508,
+      "unlock_date_utc": "2029-10-04T13:21:48.000Z"
+    }
+  },
+  "deployer": "0xC6824Be06bB99e5650e3fd4D7A54984241A476B3",
+  "transaction_hash": "0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82",
+  "recipients": {
+    "Liquidity Reserve": "0x8A4d5a891172EE81a3eb60343A5D15847c19aBDF",
+    "Seller": "0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc",
+    "Community and Ecosystem": "0xBffb8991e22FC38bAD6Bd3b553B9a457B36b09c1",
+    "Project Treasury": "0x822b4D5711740A3Ee3d1F30C3Eeb06b794537767",
+    "Social Causes": "0x3201B47e29c5d49f801D3a760caCA74e462BfaA2",
+    "Founder Beneficiary": "0x411A15118FABE788B285EEEeD0Ee0192076f2603"
+  },
+  "note": "Testnet deployment only. Addresses and tokens have no production effect or real value."
+}
