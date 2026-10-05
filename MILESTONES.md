@@ -2,7 +2,7 @@
 
 **Project root:** `~/Projects/Blockchain-VCTR`  
 **Goal:** launch a simple Base token that needs no owner action after deployment, does not sponsor users' gas, and has no recurring service to operate.  
-**Status:** the contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Eight local contract EVM checks and three deployment-config checks pass; the Foundry invariant campaign previously completed two tests with 128 runs at depth 128. The token is deployed and read-only verified on Ethereum Sepolia. The user has waived the Base Sepolia rehearsal after that test. Base Mainnet deployment and read-only verification support is implemented but has not been used. Independent review remains open; use the public [security review request](SECURITY_REVIEW_REQUEST.md). Reconfirm the six recipient addresses and liquidity budget before any mainnet transaction or pool deposit. See `README.md` and `config/tokenomics.json`.
+**Status:** the contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Eight local contract EVM checks and three deployment-config checks pass; the Foundry invariant campaign previously completed two tests with 128 runs at depth 128. The token is deployed and read-only verified on Ethereum Sepolia. The user has waived the Base Sepolia rehearsal after that test. Base Mainnet deployment and read-only verification support is implemented but has not been used. Independent review remains open; use the public [security review request](SECURITY_REVIEW_REQUEST.md). Reconfirm the six recipient addresses and any decision to provide liquidity before a mainnet transaction or pool deposit. See `README.md` and `config/tokenomics.json`.
 
 ## The product boundary
 
@@ -16,7 +16,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 - Choose the hands-off token-only path, or change the goal to include an operated agent service.
 - Confirm the maximum one-time launch budget, including deploy gas and any paid review.
-- Current planning placeholder: ₹5,000 as **tentative at-risk liquidity capital**, subject to explicit reconfirmation at actual Base Mainnet pool deployment. This does not authorize a deposit or fix the VCTR amount or paired asset. Pool liquidity can lose value. If not reconfirmed then, skip the pool; the token can deploy without project-provided trading liquidity.
+- Decide separately whether to provide initial liquidity. No liquidity amount, VCTR quantity, or paired asset is specified here; document and approve any such decision before a pool deposit. Liquidity can lose value, and the token can deploy without project-provided trading liquidity.
 - Confirm Base as the chain and 0% transfer/application fees with senders paying their own gas.
 
 **Exit evidence:** written scope and a rupee budget split into service/review costs, network gas, and optional at-risk liquidity.
@@ -81,7 +81,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
   irreversible-deployment confirmations.
 - Run `npm run verify:base-mainnet`, verify token and child-contract source on
   BaseScan, and publish addresses and transaction records.
-- Make no liquidity deposit unless Milestone 0 explicitly kept the ₹5,000 risk-capital allocation.
+- Make no liquidity deposit unless the amount, paired asset, custody, and risks have been explicitly documented and approved.
 
 **Exit evidence:** verified mainnet addresses, final balances, documented launch expenses, and no unexpected contract authority.
 
@@ -105,10 +105,10 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 - **One-time service/review cost:** only applies if paid external help is selected; scope and quote must be approved in Milestone 0.
 - **Deployment gas:** real Base ETH for mainnet transactions; varies, so obtain a live quote near deployment.
-- **Liquidity capital:** tentatively ₹5,000, optional, separate from fees and gas, and at risk; reconfirm before any mainnet deposit. The actual VCTR amount and paired asset remain undecided.
+- **Liquidity capital:** optional, separate from fees and gas, and at risk. Decide and document the amount, VCTR quantity, paired asset, and LP-position custody before any mainnet deposit.
 - **Ordinary holder transfers:** paid by the transaction sender in Base ETH; the project does not sponsor them.
 - **Recurring infrastructure:** ₹0 for the token-only design because it has no required server or hosted service. Optional domains, hosting, paid monitoring, support, and future transactions can add costs if chosen later.
 
 ## Start condition
 
-Do not deploy or spend launch funds until Milestone 0 and Milestone 1 have written answers. In particular, resolve the service-versus-hands-off choice, confirm the final constructor addresses, and reconfirm whether the ₹5,000 liquidity allocation is still allowed.
+Do not deploy or spend launch funds until Milestone 0 and Milestone 1 have written answers. In particular, resolve the service-versus-hands-off choice, confirm the final constructor addresses, and decide whether to provide liquidity with documented terms.

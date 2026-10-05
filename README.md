@@ -1,35 +1,66 @@
 # VCTR AI Token
 
-Fixed-supply ERC-20 development project for a planned Base launch. **This is not
-ready for Base Mainnet deployment. Contracts compile and local EVM tests cover
-the allocation and lock behavior. A public Ethereum Sepolia test deployment
-has been made; nothing has been deployed to Base Sepolia or Base Mainnet.
+VCTR AI Token is a fixed-supply ERC-20 designed for deployment on Base. Its product vision is to support an autonomous AI-to-AI economy where agents can pay for compute and license vector embeddings or synthetic datasets, with the potential for very small payments and machine-readable settlement.
 
-## Token behavior
+**That product vision is not a claim about features currently implemented.** The deployed contract is a token and allocation-lock system only. It does not implement an AI-agent protocol, marketplace, compute purchasing, dataset licensing, zero-knowledge proofs, sub-millisecond finality, or fiat-denominated payment guarantees. Those capabilities require separate systems, integrations, and independent evaluation. VCTR does not eliminate Base network fees, confirmation time, or other blockchain constraints. The token does not require human approval for ordinary transfers, but wallet owners remain responsible for their keys and transactions.
 
-- Name: `VCTR AI Token`; symbol: `VCTR`; decimals: 18; supply: 10 billion.
-- No owner, post-deployment mint, pause, upgrade, transfer tax, or blacklist.
-- Zero-value `transfer` and `transferFrom` calls revert; any positive amount is allowed, down to 1 wei.
-- Founder allocation: 3 billion tokens held by `FounderVesting`. It has a
-  15 × 365-day cliff followed by continuous linear vesting over 5 × 365 days.
-  Only the beneficiary can claim accrued tokens.
-- Community and ecosystem: 500 million; project treasury: 1 billion; social
-  causes: 1.5 billion. Each allocation is held in a separate immutable
-  `AllocationTimelock`, and only its named beneficiary may claim it after
-  3 × 365 days from the token deployment timestamp.
-- Liquidity reserve: 1 billion tokens sent to its designated wallet. The
-  amount and pair used for any initial pool are not yet selected.
-- Direct sales: 3 billion tokens sent to the Seller wallet. Publish sale terms
-  before selling; unsold tokens remain unsold.
+## Current release
 
-All allocation destinations are constructor inputs. A wrong destination cannot
-be changed after deployment. Locked allocations are not automatically
-transferred: the beneficiary must call the relevant `release()` function after
-the cliff. The vesting and timelock contracts have no admin or recovery path.
+- Token name: `VCTR AI Token`
+- Symbol: `VCTR`
+- Decimals: 18
+- Fixed supply: 10,000,000,000 VCTR
+- Intended production network: Base Mainnet (chain ID `8453`)
+- Upgradeable: no
+- Administrator, post-deployment mint, pause, blacklist, or transfer tax: none
+- Project-operated server or gas sponsorship: none
 
-## Build and test locally
+The contracts are immutable after deployment. There is no administrator or recovery function. An incorrect constructor address, lost key, or contract defect cannot be corrected by upgrading the deployed contracts.
 
-From this directory, with Node.js and the pinned pnpm dependencies available:
+## Allocation and lock rules
+
+| Allocation | Amount | On-chain handling |
+| --- | ---: | --- |
+| Founder lock | 3,000,000,000 (30%) | Held by the immutable vesting contract. No release during the first 15 × 365 days; then released linearly over 5 × 365 days to the named beneficiary. |
+| Liquidity reserve | 1,000,000,000 (10%) | Sent to the configured reserve wallet. The pool amount and paired asset are not set by the token contract. |
+| Direct sales | 3,000,000,000 (30%) | Sent to the configured Seller wallet. Sale terms should be published before any sale; unsold tokens remain unsold. |
+| Community and ecosystem | 500,000,000 (5%) | Held in an immutable timelock until 3 × 365 days after deployment, then claimable by its named beneficiary. |
+| Project treasury | 1,000,000,000 (10%) | Held in a separate immutable timelock until 3 × 365 days after deployment, then claimable by its named beneficiary. |
+| Social causes | 1,500,000,000 (15%) | Held in a separate immutable timelock until 3 × 365 days after deployment, then claimable by its named beneficiary. |
+
+The allocations sum to exactly 10 billion VCTR. Constructor recipients are fixed at deployment and cannot be changed. Locked tokens are not transferred automatically: the relevant beneficiary must call `release()` after the applicable schedule permits it. The token accepts positive transfer amounts down to 1 wei and rejects zero-value `transfer` and `transferFrom` calls.
+
+## Network and deployment status
+
+VCTR has been deployed and read-only verified on **Ethereum Sepolia**, a public test network, at `0xB43557D42e54875D1526A35317727dE338dfD2ee`. The transaction is [`0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82`](https://sepolia.etherscan.io/tx/0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82). The [deployment report](deployments/ethereum-sepolia.json) records the vesting contract, allocation locks, recipients, and unlock times.
+
+Ethereum Sepolia is not Base. The project has chosen to waive a Base Sepolia rehearsal. As a result, Base-specific testnet RPC and explorer behavior has not been rehearsed. Base Mainnet deployment support exists but has **not** been used; no VCTR Mainnet address is being claimed here. Base documents chain ID `8453` for Mainnet in its [`eth_chainId` reference](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId).
+
+The deployment helper supports Ethereum Sepolia, Base Sepolia, and Base Mainnet:
+
+```sh
+npm run deploy:ethereum-sepolia
+npm run deploy:base-sepolia
+npm run deploy:base-mainnet
+```
+
+For testnets, use a dedicated test-only key in the ignored local `.env` as `DEPLOYER_PRIVATE_KEY`. The Base Mainnet helper uses the separate `BASE_MAINNET_DEPLOYER_PRIVATE_KEY` and `BASE_MAINNET_RPC` settings. Before it can submit a transaction, it verifies chain ID `8453`, checks the deployer balance against a padded gas estimate at the current maximum fee, displays and asks you to confirm all six recipient addresses, requires typed network and irreversible-deployment confirmations, and requires `BASE_MAINNET_APPROVED_COMMIT` to match the full current Git commit on a clean working tree. It waits for five confirmations and writes a deployment report after success.
+
+These checks reduce common operator mistakes; they do not make an immutable deployment reversible or guarantee that deployment is safe. Use a dedicated deployment account, independently review the final source and addresses, and never put recovery phrases or production wallet keys in source control or chat. A confirmed deployment spends real Base ETH.
+
+After deployment, run the network-specific read-only verifier, for example:
+
+```sh
+npm run verify:ethereum-sepolia
+npm run verify:base-sepolia
+npm run verify:base-mainnet
+```
+
+The verifier checks the chain, deployment receipt, bytecode, token metadata, total supply, allocation balances, recipient addresses, lock schedules, early-release reverts, and transfer behavior. Its call simulations do not change chain state. It does not publish source code to BaseScan; independently verify and publish the deployed source there as a separate launch step.
+
+## Build and test
+
+With Node.js and the pinned dependencies available:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -37,88 +68,23 @@ pnpm run compile:contracts
 pnpm run test:evm
 ```
 
-Tests use a temporary local EVM with simulated accounts, funds, and time. They
-do not submit network transactions or spend real ETH.
-
-The Foundry invariant suite requires Foundry to be installed and runs with:
+The Node EVM suite runs against a temporary local chain with simulated accounts, balances, and time. It does not send transactions to a public network or spend real ETH. The Foundry invariant suite requires Foundry:
 
 ```sh
 forge test
 ```
 
-It fuzzes bounded sequences of transfers, delegated transfers, time advances,
-and vesting/timelock claims. The invariants check that total supply and tracked
-balances remain conserved, founder releases never exceed accrued vesting, and
-allocation locks never release early or lose their locked amounts. The default
-campaign uses 128 runs at depth 128.
+The invariant suite fuzzes transfers, delegated transfers, time advances, and lock claims, checking supply and balance conservation and the release schedules. The configured campaign uses 128 runs at depth 128. Tests are evidence about the tested code and scenarios; they are not a substitute for an independent security audit or a guarantee against unknown defects.
 
-## Sepolia test deployment
+## Security and launch checklist
 
-The deployment helper supports Ethereum Sepolia, Base Sepolia, and Base
-Mainnet. Testnet deployments check the selected chain ID, print all six
-allocation recipients, estimate gas, and require typed confirmations. Run
-`npm run deploy:ethereum-sepolia` for Ethereum Sepolia or
-`npm run deploy:base-sepolia` for Base Sepolia; the legacy
-`npm run deploy:sepolia` command still selects Base Sepolia by default.
+Before any Base Mainnet deployment:
 
-VCTR was deployed to **Ethereum Sepolia** (chain ID 11155111) at
-`0xB43557D42e54875D1526A35317727dE338dfD2ee` in transaction
-[`0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82`](https://sepolia.etherscan.io/tx/0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82).
-The [deployment report](deployments/ethereum-sepolia.json) records the founder
-vesting contract, all three allocation locks, recipients, and unlock times.
-Run `npm run verify:ethereum-sepolia` to check the confirmed receipt, bytecode,
-metadata, total supply, balances, lock schedules, early-claim reverts, and
-zero/positive transfer simulations against the public chain. The simulations
-use `eth_call` and do not modify chain state; local EVM tests cover actual token
-transfers and claims.
+1. Complete and document an independent review of the exact source, compiler settings, constructor arguments, and deployment procedure. The [security review request](SECURITY_REVIEW_REQUEST.md) describes the requested scope.
+2. Resolve or explicitly accept review findings and bind approval to the exact clean Git commit used for deployment.
+3. Reconfirm all six recipient addresses using a trusted, independent channel. Addresses are permanent once deployed.
+4. Review live gas estimates and fund only the dedicated deployment account with the amount required for deployment.
+5. Deploy only after the review and operational checks are complete; then run the read-only verifier and verify the source on BaseScan.
+6. Publish the final Mainnet address, transaction, verified source, allocation details, lock schedules, and material risks. Do not imply that testnet tokens have value or that unsold sale allocations were sold or distributed.
 
-Ethereum Sepolia is a distinct network from Base. The user has chosen to waive
-the Base Sepolia rehearsal after testing on Ethereum Sepolia. This means the
-Base RPC and explorer flow has not been rehearsed on a public testnet. Before
-any Base Mainnet transaction, the script checks chain ID 8453 and the
-read-only verifier can validate the deployed values against the selected
-network and tokenomics file. Testnet ETH and VCTR have no real-world value.
-
-Testnet deployments read `DEPLOYER_PRIVATE_KEY` from the ignored local `.env`;
-use only a dedicated test-only account. Base Mainnet requires the separate
-`BASE_MAINNET_DEPLOYER_PRIVATE_KEY`, verifies the RPC reports chain ID 8453,
-checks that the wallet can cover the estimated gas limit at the current max
-fee, waits for five confirmations, and asks for three exact typed confirmations
-(recipient addresses, network name, and irreversible real-ETH deployment).
-It also requires `BASE_MAINNET_APPROVED_COMMIT` to equal the full current Git
-commit hash and rejects a dirty working tree, binding deployment to the
-reviewed release snapshot. Use a separate deployment-only key and never put a
-recovery phrase or a production wallet key in source control or chat. Mainnet
-support is implemented but has **not** been used to deploy. The helper writes
-a deployment record to `deployments/base-mainnet.json` only after the
-transaction confirms.
-
-After a Base Mainnet deployment, run `npm run verify:base-mainnet`. This is a
-read-only on-chain check of the receipt, metadata, supply, allocation balances,
-recipient addresses, lock schedules, early-claim reverts, and transfer behavior.
-It does not publish source code to BaseScan; source verification on BaseScan is
-a separate required launch step. Base chain ID 8453 is documented by [Base's
-`eth_chainId` reference](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId).
-
-## Remaining before Mainnet
-
-- Complete an independent Solidity review of the final source and resolve or
-  explicitly accept all findings. The public [review request](SECURITY_REVIEW_REQUEST.md)
-  pins the current contract scope and lists requested evidence.
-- Base Sepolia rehearsal is waived by the user after Ethereum Sepolia testing.
-  Accept that Base-specific RPC and explorer configuration is not testnet
-  rehearsed; the deployment helper's chain-ID guard and post-deployment checks
-  do not replace a Base Sepolia rehearsal.
-- Finalize whether to provide initial liquidity. The ₹5,000 figure is
-  tentative at-risk capital, not an approved deposit; confirm the pair, VCTR
-  amount, LP-position custody, and budget at that time.
-- Finalize direct-sale terms and publish accurate allocation, lock, and risk
-  disclosures before any sale or public launch.
-- Complete the independent review before any Mainnet transaction. The helper
-  supports Base Mainnet but has not been run; use the separate key, review the
-  live gas estimate and all six recipients, then verify source on BaseScan.
-- Reconcile the reviewed source, compiler settings, constructor addresses,
-  deployment result, and final public documentation before launch.
-
-The optional `local_tool` FastAPI app is an arithmetic-only allocation checker;
-it does not connect to a blockchain or affect contract behavior.
+There is no Mainnet deployment yet. Independent review and the Base-specific testnet rehearsal remain outstanding; the latter was explicitly waived. Liquidity decisions, sale terms, and any future AI-agent services are separate from deploying the token and must be documented independently. The optional `local_tool` FastAPI app is an arithmetic-only allocation checker; it does not connect to a blockchain or affect contract behavior.
