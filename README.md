@@ -54,12 +54,12 @@ campaign uses 128 runs at depth 128.
 
 ## Sepolia test deployment
 
-The testnet-only deploy helper supports Ethereum Sepolia and Base Sepolia. It
-checks the selected chain ID, prints all six allocation recipients, asks for
-address confirmation, estimates test-ETH cost, and requires a separate typed
-confirmation before sending. To choose Ethereum Sepolia, run
-`npm run deploy:ethereum-sepolia`; Base Sepolia remains the default for
-`npm run deploy:sepolia`.
+The deployment helper supports Ethereum Sepolia, Base Sepolia, and Base
+Mainnet. Testnet deployments check the selected chain ID, print all six
+allocation recipients, estimate gas, and require typed confirmations. Run
+`npm run deploy:ethereum-sepolia` for Ethereum Sepolia or
+`npm run deploy:base-sepolia` for Base Sepolia; the legacy
+`npm run deploy:sepolia` command still selects Base Sepolia by default.
 
 VCTR was deployed to **Ethereum Sepolia** (chain ID 11155111) at
 `0xB43557D42e54875D1526A35317727dE338dfD2ee` in transaction
@@ -72,33 +72,51 @@ zero/positive transfer simulations against the public chain. The simulations
 use `eth_call` and do not modify chain state; local EVM tests cover actual token
 transfers and claims.
 
-Ethereum Sepolia is a distinct network from Base Sepolia. This deployment
-validates the contracts on a public EVM testnet but does not validate Base's
-RPC, chain selection, or explorer configuration. The deployment uses test ETH
-and VCTR with no real-world value.
+Ethereum Sepolia is a distinct network from Base. The user has chosen to waive
+the Base Sepolia rehearsal after testing on Ethereum Sepolia. This means the
+Base RPC and explorer flow has not been rehearsed on a public testnet. Before
+any Base Mainnet transaction, the script checks chain ID 8453 and the
+read-only verifier can validate the deployed values against the selected
+network and tokenomics file. Testnet ETH and VCTR have no real-world value.
 
-The script reads `DEPLOYER_PRIVATE_KEY` from the ignored local `.env`. Use only
-a dedicated test-only account with no real assets; never put a recovery phrase
-or a production wallet key in `.env`, and never share secrets in chat. Base
-Sepolia deployment is optional for local development but remains a project
-readiness gate before any Mainnet release. A Base Sepolia rehearsal remains a
-separate readiness item before a Base Mainnet release.
+Testnet deployments read `DEPLOYER_PRIVATE_KEY` from the ignored local `.env`;
+use only a dedicated test-only account. Base Mainnet requires the separate
+`BASE_MAINNET_DEPLOYER_PRIVATE_KEY`, verifies the RPC reports chain ID 8453,
+checks that the wallet can cover the estimated gas limit at the current max
+fee, waits for five confirmations, and asks for three exact typed confirmations
+(recipient addresses, network name, and irreversible real-ETH deployment).
+It also requires `BASE_MAINNET_APPROVED_COMMIT` to equal the full current Git
+commit hash and rejects a dirty working tree, binding deployment to the
+reviewed release snapshot. Use a separate deployment-only key and never put a
+recovery phrase or a production wallet key in source control or chat. Mainnet
+support is implemented but has **not** been used to deploy. The helper writes
+a deployment record to `deployments/base-mainnet.json` only after the
+transaction confirms.
+
+After a Base Mainnet deployment, run `npm run verify:base-mainnet`. This is a
+read-only on-chain check of the receipt, metadata, supply, allocation balances,
+recipient addresses, lock schedules, early-claim reverts, and transfer behavior.
+It does not publish source code to BaseScan; source verification on BaseScan is
+a separate required launch step. Base chain ID 8453 is documented by [Base's
+`eth_chainId` reference](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId).
 
 ## Remaining before Mainnet
 
 - Complete an independent Solidity review of the final source and resolve or
   explicitly accept all findings. The public [review request](SECURITY_REVIEW_REQUEST.md)
   pins the current contract scope and lists requested evidence.
-- Deploy and verify the reviewed token and child-contract sources on Base
-  Sepolia, or explicitly document the risks accepted if that rehearsal is
-  skipped.
+- Base Sepolia rehearsal is waived by the user after Ethereum Sepolia testing.
+  Accept that Base-specific RPC and explorer configuration is not testnet
+  rehearsed; the deployment helper's chain-ID guard and post-deployment checks
+  do not replace a Base Sepolia rehearsal.
 - Finalize whether to provide initial liquidity. The ₹5,000 figure is
   tentative at-risk capital, not an approved deposit; confirm the pair, VCTR
   amount, LP-position custody, and budget at that time.
 - Finalize direct-sale terms and publish accurate allocation, lock, and risk
   disclosures before any sale or public launch.
-- Prepare a Mainnet deployment and source-verification procedure with secure
-  signing-key custody. The current script does not support Base Mainnet.
+- Complete the independent review before any Mainnet transaction. The helper
+  supports Base Mainnet but has not been run; use the separate key, review the
+  live gas estimate and all six recipients, then verify source on BaseScan.
 - Reconcile the reviewed source, compiler settings, constructor addresses,
   deployment result, and final public documentation before launch.
 

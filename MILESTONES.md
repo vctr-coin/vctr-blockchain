@@ -2,7 +2,7 @@
 
 **Project root:** `~/Projects/Blockchain-VCTR`  
 **Goal:** launch a simple Base token that needs no owner action after deployment, does not sponsor users' gas, and has no recurring service to operate.  
-**Status:** draft contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Compilation, seven local EVM tests, and two Foundry invariants pass; the invariant campaign uses 128 runs at depth 128. A guarded Base Sepolia deployment helper is prepared but has not been run. The user reports verifying all six recipient addresses in MetaMask; recheck the exact constructor values at deployment. Independent review and Base Sepolia deployment/verification remain. Reconfirm the liquidity budget and pool parameters before any mainnet deposit. See `README.md` and `config/tokenomics.json`.
+**Status:** the contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Eight local contract EVM checks and three deployment-config checks pass; the Foundry invariant campaign previously completed two tests with 128 runs at depth 128. The token is deployed and read-only verified on Ethereum Sepolia. The user has waived the Base Sepolia rehearsal after that test. Base Mainnet deployment and read-only verification support is implemented but has not been used. Independent review remains open; use the public [security review request](SECURITY_REVIEW_REQUEST.md). Reconfirm the six recipient addresses and liquidity budget before any mainnet transaction or pool deposit. See `README.md` and `config/tokenomics.json`.
 
 ## The product boundary
 
@@ -41,19 +41,21 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 **Exit evidence:** source matches the approved specification; supply is created once; no privileged or hidden controls remain.
 
-### 3. Verify locally, then on Base Sepolia
+### 3. Verify locally and on Ethereum Sepolia; Base Sepolia rehearsal waived
 
 - Compile and inspect the contracts in a local environment. Eight Node EVM checks cover allocations, positive-only transfer behavior, absence of owner/mint/pause/upgrade functions, founder vesting, three-year allocation locks, and invalid recipients. Foundry invariant campaigns fuzz transfers, delegated transfers, time advances, and lock claims while asserting supply conservation and release schedules (128 runs at depth 128).
-- Deploy to Base Sepolia using test ETH and verify the token, founder vesting,
-  and all three allocation-lock sources.
-- Check total supply, all initial balances, each cliff and beneficiary claim, 0% transfers, sender-paid gas, and absence of owner/mint/pause functions.
-- Exercise transfers between separate wallets and document the exact production steps.
+- Deploy to Ethereum Sepolia using test ETH; the deployment report and
+  `npm run verify:ethereum-sepolia` record/check the token, founder vesting,
+  and all three allocation locks.
+- The user has explicitly chosen to skip Base Sepolia. This accepts that the
+  Base RPC/explorer path is not rehearsed on a testnet; do not present Ethereum
+  Sepolia as a Base-specific deployment test.
 
-**Exit evidence:** recorded testnet addresses and transactions; results match the allocation table; no real funds used.
+**Exit evidence:** recorded Ethereum Sepolia addresses and transaction; public-chain values match the allocation table; no real funds used. Base Sepolia remains waived.
 
 ### 4. Independent review and irreversible-launch check
 
-- Have an independent Solidity reviewer inspect the final source, compiler settings, allocation destinations, and vesting setup.
+- Have an independent Solidity reviewer inspect the final source, compiler settings, allocation destinations, and vesting setup. The public request in `SECURITY_REVIEW_REQUEST.md` pins the contract snapshot and asks for reproducible findings and retest evidence; the FirePan free surface scan is not an audit.
 - Reconcile the compiled bytecode and verified testnet source with the reviewed release.
 - Review the final launch transaction details on a separate device/session.
 - Do not proceed with unresolved critical findings.
@@ -72,8 +74,13 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 ### 6. Deploy to Base Mainnet — spending gate
 
 - Obtain a live gas estimate and confirm it fits the approved one-time budget.
-- Deploy the exact reviewed token and any separately reviewed vesting contracts.
-- Verify source and publish addresses and transaction records.
+- Run `npm run deploy:base-mainnet` only after the exact release source and
+  recipients are independently reviewed and approved. The helper enforces
+  chain ID, a separate Mainnet key, an exact reviewed commit on a clean Git
+  tree, a balance check against the estimated gas limit and max fee, and typed
+  irreversible-deployment confirmations.
+- Run `npm run verify:base-mainnet`, verify token and child-contract source on
+  BaseScan, and publish addresses and transaction records.
 - Make no liquidity deposit unless Milestone 0 explicitly kept the ₹5,000 risk-capital allocation.
 
 **Exit evidence:** verified mainnet addresses, final balances, documented launch expenses, and no unexpected contract authority.
@@ -91,7 +98,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 | Stage | Network/assets | What it demonstrates |
 |---|---|---|
 | Local | Temporary local chain and generated test wallets | Contract logic and repeatable walkthrough; no persistent chain state or real funds |
-| Public test | Base Sepolia test ETH and test VCTR | Wallet/RPC/deployment/source-verification flow; no real market demand or production security guarantee |
+| Public test | Ethereum Sepolia test ETH and test VCTR (completed); Base Sepolia rehearsal waived | Public EVM deployment/contract behavior; does not rehearse Base RPC/explorer behavior, market demand, or provide a production security guarantee |
 | Production | Base Mainnet and real ETH | Real contract deployment and real user transactions; fees and mistakes are real and irreversible |
 
 ## Cost categories

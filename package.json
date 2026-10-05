@@ -4,11 +4,15 @@
   "version": "0.1.0",
   "scripts": {
     "compile:contracts": "node scripts/compile.mjs",
-    "test:evm": "node --test tests/evm.test.mjs",
+    "test:evm": "node --test tests/*.test.mjs",
     "test:foundry": "forge test",
-    "deploy:sepolia": "node scripts/deploy-sepolia.mjs",
-    "deploy:ethereum-sepolia": "DEPLOY_NETWORK=ethereum-sepolia node scripts/deploy-sepolia.mjs",
-    "verify:ethereum-sepolia": "node scripts/verify-ethereum-sepolia.mjs"
+    "deploy:sepolia": "node scripts/deploy-vctr.mjs",
+    "deploy:base-sepolia": "DEPLOY_NETWORK=base-sepolia node scripts/deploy-vctr.mjs",
+    "deploy:ethereum-sepolia": "DEPLOY_NETWORK=ethereum-sepolia node scripts/deploy-vctr.mjs",
+    "deploy:base-mainnet": "DEPLOY_NETWORK=base-mainnet node scripts/deploy-vctr.mjs",
+    "verify:ethereum-sepolia": "VERIFY_NETWORK=ethereum-sepolia node scripts/verify-deployment.mjs",
+    "verify:base-sepolia": "VERIFY_NETWORK=base-sepolia node scripts/verify-deployment.mjs",
+    "verify:base-mainnet": "VERIFY_NETWORK=base-mainnet node scripts/verify-deployment.mjs"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "5.7.0",

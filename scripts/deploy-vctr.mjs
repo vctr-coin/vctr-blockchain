@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { Contract, ContractFactory, JsonRpcProvider, Wallet, formatEther, formatUnits, getAddress } from "ethers";
+import { assertApprovedMainnetRelease, resolveNetworkConfig } from "./deployment-config.mjs";
 
 const root = process.cwd();
 
@@ -17,28 +19,21 @@ function readLocalEnv(key) {
   return undefined;
 }
 
-const networkConfigs = {
-  "base-sepolia": {
-    name: "Base Sepolia",
-    chainId: 84532n,
-    rpcEnv: "BASE_SEPOLIA_RPC",
-    rpcDefault: "https://sepolia.base.org",
-    confirmation: "DEPLOY TO BASE SEPOLIA",
-    reportFile: "base-sepolia.json",
-  },
-  "ethereum-sepolia": {
-    name: "Ethereum Sepolia",
-    chainId: 11155111n,
-    rpcEnv: "ETHEREUM_SEPOLIA_RPC",
-    rpcDefault: "https://ethereum-sepolia-rpc.publicnode.com",
-    confirmation: "DEPLOY TO ETHEREUM SEPOLIA",
-    reportFile: "ethereum-sepolia.json",
-  },
-};
 const networkKey = readLocalEnv("DEPLOY_NETWORK") || "base-sepolia";
-const targetNetwork = networkConfigs[networkKey];
-if (!targetNetwork) {
-  throw new Error('DEPLOY_NETWORK must be "base-sepolia" or "ethereum-sepolia".');
+const targetNetwork = resolveNetworkConfig(networkKey);
+if (targetNetwork.isMainnet) {
+  const approvedCommit = readLocalEnv("BASE_MAINNET_APPROVED_COMMIT");
+  let currentCommit;
+  let workingTreeStatus;
+  try {
+    currentCommit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    workingTreeStatus = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    throw new Error("Base Mainnet deployment requires a Git checkout with a clean, reviewed release commit.");
+  }
+  assertApprovedMainnetRelease(approvedCommit, currentCommit, workingTreeStatus);
 }
 
 function getDraftAddresses(spec) {
@@ -86,7 +81,14 @@ try {
     throw new Error(`Wrong chain: expected ${targetNetwork.name} (${targetNetwork.chainId}), received ${network.chainId}.`);
   }
 
-  process.stdout.write(`${targetNetwork.name} only (chain ID ${targetNetwork.chainId}). This publishes a test deployment and spends test ETH.\n`);
+  process.stdout.write(`${targetNetwork.name} only (chain ID ${targetNetwork.chainId}).\n`);
+  if (targetNetwork.isMainnet) {
+    process.stdout.write(
+      "WARNING: This sends a real Base Mainnet transaction. The token and allocation contracts are immutable; no admin can pause, upgrade, or recover a mistaken deployment.\n",
+    );
+  } else {
+    process.stdout.write("This publishes a test deployment and spends test ETH.\n");
+  }
   process.stdout.write("Verify these recipient addresses in MetaMask before continuing:\n");
   labels.forEach((label, index) => process.stdout.write(`  ${label}: ${addresses[index]}\n`));
   const addressConfirmation = await rl.question('Type "ADDRESSES VERIFIED" to continue: ');
@@ -95,13 +97,18 @@ try {
   await import("./compile.mjs");
   const artifactPath = path.join(root, "artifacts/solc/VCTRToken.json");
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-  const privateKey = readLocalEnv("DEPLOYER_PRIVATE_KEY");
+  const privateKey = readLocalEnv(targetNetwork.privateKeyEnv);
   if (!privateKey || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
-    throw new Error("Set DEPLOYER_PRIVATE_KEY in the ignored local .env using a dedicated Sepolia-only deployer account.");
+    const keyPurpose = targetNetwork.isMainnet
+      ? "a dedicated Base Mainnet deployment account; do not reuse a testnet key"
+      : "a dedicated testnet-only deployer account with no real assets";
+    throw new Error(`Set ${targetNetwork.privateKeyEnv} in the ignored local .env using ${keyPurpose}.`);
   }
   const deployer = new Wallet(privateKey, provider);
   const deployerBalance = await provider.getBalance(deployer.address);
-  process.stdout.write(`Deployer: ${deployer.address}\nTest ETH available: ${formatEther(deployerBalance)}\n`);
+  process.stdout.write(
+    `Deployer: ${deployer.address}\n${targetNetwork.isMainnet ? "Base ETH" : "Test ETH"} available: ${formatEther(deployerBalance)}\n`,
+  );
 
   const factory = new ContractFactory(artifact.abi, artifact.evm.bytecode.object, deployer);
   const deployTransaction = await factory.getDeployTransaction(...addresses);
@@ -109,18 +116,32 @@ try {
   const feeData = await provider.getFeeData();
   const maxFeePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
   if (maxFeePerGas === null) throw new Error("Could not estimate Sepolia gas price.");
-  const estimatedCost = estimatedGas * maxFeePerGas;
+  const gasLimit = (estimatedGas * 120n) / 100n;
+  const estimatedCost = gasLimit * maxFeePerGas;
   if (deployerBalance < estimatedCost) {
-    throw new Error(`Insufficient test ETH. Estimated deployment cost: ${formatEther(estimatedCost)} test ETH.`);
+    const currency = targetNetwork.isMainnet ? "Base ETH" : "test ETH";
+    throw new Error(`Insufficient funds. Maximum estimated deployment cost: ${formatEther(estimatedCost)} ${currency}.`);
   }
-  process.stdout.write(`Estimated gas: ${estimatedGas}\nEstimated cost: ${formatEther(estimatedCost)} test ETH\n`);
-  const sendConfirmation = await rl.question(`Type "${targetNetwork.confirmation}" to submit this test transaction: `);
-  if (sendConfirmation !== targetNetwork.confirmation) throw new Error("Deployment confirmation did not match; stopped without sending.");
+  process.stdout.write(
+    `Estimated gas: ${estimatedGas}\nGas limit with 20% headroom: ${gasLimit}\nMaximum estimated cost: ${formatEther(estimatedCost)} ${targetNetwork.isMainnet ? "Base ETH" : "test ETH"}\n`,
+  );
+  const sendConfirmation = await rl.question(`Type "${targetNetwork.confirmation}" to submit this transaction: `);
+  if (sendConfirmation !== targetNetwork.confirmation) {
+    throw new Error("Network confirmation did not match; stopped without sending.");
+  }
+  if (targetNetwork.isMainnet) {
+    const irreversibleConfirmation = await rl.question(
+      `Type "${targetNetwork.irreversibleConfirmation}" to authorize real, irreversible deployment: `,
+    );
+    if (irreversibleConfirmation !== targetNetwork.irreversibleConfirmation) {
+      throw new Error("Irreversible-deployment confirmation did not match; stopped without sending.");
+    }
+  }
 
   const token = await factory.deploy(...addresses, {
-    gasLimit: estimatedGas * 120n / 100n,
+    gasLimit,
   });
-  const receipt = await token.deploymentTransaction().wait(1);
+  const receipt = await token.deploymentTransaction().wait(targetNetwork.confirmations);
   const tokenAddress = await token.getAddress();
   const vestingAddress = await token.founderVesting();
   const allocationLockAbi = [
@@ -166,13 +187,15 @@ try {
     deployer: deployer.address,
     transaction_hash: receipt.hash,
     recipients: Object.fromEntries(labels.map((label, index) => [label, addresses[index]])),
-    note: "Testnet deployment only. Addresses and tokens have no production effect or real value.",
+    note: targetNetwork.isMainnet
+      ? "Base Mainnet deployment. Immutable deployment; independently verify the source and all constructor destinations before public launch."
+      : "Testnet deployment only. Addresses and tokens have no production effect or real value.",
   };
   const reportDirectory = path.join(root, "deployments");
   fs.mkdirSync(reportDirectory, { recursive: true });
   const reportPath = path.join(reportDirectory, targetNetwork.reportFile);
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { flag: "w" });
-  process.stdout.write(`\n${targetNetwork.name} test deployment confirmed in block ${receipt.blockNumber}.\n`);
+  process.stdout.write(`\n${targetNetwork.name} deployment confirmed in block ${receipt.blockNumber}.\n`);
   process.stdout.write(`Token: ${tokenAddress}\nFounder vesting: ${vestingAddress}\nReport: ${reportPath}\n`);
   for (const [label, lock] of Object.entries(allocationLocks)) {
     process.stdout.write(`${label} lock: ${lock.contract_address} (unlocks ${lock.unlock_date_utc})\n`);

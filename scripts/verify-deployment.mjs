@@ -4,16 +4,45 @@ import path from "node:path";
 import { Contract, Interface, JsonRpcProvider, formatUnits, getAddress } from "ethers";
 
 const root = process.cwd();
-const chainIdRequired = 11155111n;
+const verificationTargets = {
+  "ethereum-sepolia": {
+    name: "Ethereum Sepolia",
+    chainId: 11155111n,
+    rpcEnv: "ETHEREUM_SEPOLIA_RPC",
+    rpcDefault: "https://ethereum-sepolia-rpc.publicnode.com",
+    reportFile: "ethereum-sepolia.json",
+  },
+  "base-sepolia": {
+    name: "Base Sepolia",
+    chainId: 84532n,
+    rpcEnv: "BASE_SEPOLIA_RPC",
+    rpcDefault: "https://sepolia.base.org",
+    reportFile: "base-sepolia.json",
+  },
+  "base-mainnet": {
+    name: "Base Mainnet",
+    chainId: 8453n,
+    rpcEnv: "BASE_MAINNET_RPC",
+    rpcDefault: "https://mainnet.base.org",
+    reportFile: "base-mainnet.json",
+  },
+};
+const verificationKey = process.env.VERIFY_NETWORK || "ethereum-sepolia";
+const targetNetwork = verificationTargets[verificationKey];
+if (!targetNetwork) {
+  throw new Error('VERIFY_NETWORK must be "ethereum-sepolia", "base-sepolia", or "base-mainnet".');
+}
+const chainIdRequired = targetNetwork.chainId;
 const unit = 10n ** 18n;
-const report = JSON.parse(fs.readFileSync(path.join(root, "deployments/ethereum-sepolia.json"), "utf8"));
+const report = JSON.parse(fs.readFileSync(path.join(root, `deployments/${targetNetwork.reportFile}`), "utf8"));
 const artifact = JSON.parse(fs.readFileSync(path.join(root, "artifacts/solc/VCTRToken.json"), "utf8"));
-const rpcUrl = process.env.ETHEREUM_SEPOLIA_RPC || "https://ethereum-sepolia-rpc.publicnode.com";
+const rpcUrl = process.env[targetNetwork.rpcEnv] || targetNetwork.rpcDefault;
 const provider = new JsonRpcProvider(rpcUrl, Number(chainIdRequired), { staticNetwork: true });
 
 try {
   const network = await provider.getNetwork();
-  assert.equal(network.chainId, chainIdRequired, "RPC must be Ethereum Sepolia");
+  assert.equal(network.chainId, chainIdRequired, `RPC must be ${targetNetwork.name}`);
+  assert.equal(report.network, targetNetwork.name);
   assert.equal(report.chain_id, Number(chainIdRequired));
   const receipt = await provider.getTransactionReceipt(report.transaction_hash);
   assert.ok(receipt, "deployment transaction must be confirmed");
@@ -25,6 +54,19 @@ try {
 
   const tokenCode = await provider.getCode(report.token_address);
   assert.notEqual(tokenCode, "0x", "token bytecode must exist");
+  const tokenomics = JSON.parse(fs.readFileSync(path.join(root, "config/tokenomics.json"), "utf8"));
+  const allocationRows = Object.fromEntries(tokenomics.allocations.map((row) => [row.name, row]));
+  const expectedRecipients = {
+    "Liquidity Reserve": allocationRows.Liquidity.destination_wallet,
+    Seller: allocationRows["Direct sales"].destination_wallet,
+    "Community and Ecosystem": allocationRows["Community and ecosystem"].destination_wallet,
+    "Project Treasury": allocationRows["Project treasury"].destination_wallet,
+    "Social Causes": allocationRows["Social causes"].destination_wallet,
+    "Founder Beneficiary": allocationRows["Founder lock"].beneficiary_wallet,
+  };
+  for (const [label, expected] of Object.entries(expectedRecipients)) {
+    assert.equal(getAddress(report.recipients[label]), getAddress(expected), `${label} report/config mismatch`);
+  }
   const token = new Contract(report.token_address, artifact.abi, provider);
   assert.equal(await token.name(), "VCTR AI Token");
   assert.equal(await token.symbol(), "VCTR");
@@ -99,7 +141,7 @@ try {
   assert.equal(await token.balanceOf(report.recipients.Seller), 3_000_000_000n * unit, "eth_call must not alter state");
   assert.equal(await token.balanceOf(recipient), 0n, "eth_call must not alter state");
 
-  process.stdout.write(`PASS: Ethereum Sepolia chain ID ${network.chainId}; deployment receipt ${receipt.hash} in block ${receipt.blockNumber}.\n`);
+  process.stdout.write(`PASS: ${targetNetwork.name} chain ID ${network.chainId}; deployment receipt ${receipt.hash} in block ${receipt.blockNumber}.\n`);
   process.stdout.write(`PASS: VCTR AI Token (${await token.symbol()}, ${await token.decimals()} decimals) has exactly ${formatUnits(await token.totalSupply(), 18)} tokens.\n`);
   process.stdout.write("PASS: all six allocations and the four immutable vesting/timelock contracts match the deployment report.\n");
   process.stdout.write("PASS: founder cliff and all three-year locks reject premature release calls.\n");
