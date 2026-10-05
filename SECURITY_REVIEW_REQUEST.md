@@ -1,6 +1,6 @@
 # Independent Smart Contract Security Review Request
 
-**Status:** Review requested; no independent human audit has been completed.
+**Status:** Optional review request; no independent human audit has been completed. A human review is not a technical requirement enforced by Base or the deployment helper.
 
 ## Review target
 

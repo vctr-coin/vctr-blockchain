@@ -2,7 +2,7 @@
 
 **Project root:** `~/Projects/Blockchain-VCTR`  
 **Goal:** launch a simple Base token that needs no owner action after deployment, does not sponsor users' gas, and has no recurring service to operate.  
-**Status:** the contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Eight local contract EVM checks and three deployment-config checks pass; the Foundry invariant campaign previously completed two tests with 128 runs at depth 128. The token is deployed and read-only verified on Ethereum Sepolia. The user has waived the Base Sepolia rehearsal after that test. Base Mainnet deployment and read-only verification support is implemented but has not been used. Independent review remains open; use the public [security review request](SECURITY_REVIEW_REQUEST.md). Reconfirm the six recipient addresses and any decision to provide liquidity before a mainnet transaction or pool deposit. See `README.md` and `config/tokenomics.json`.
+**Status:** the contracts implement the 10-billion-token allocation, a 15 × 365-day founder cliff followed by five years of continuous linear vesting, and three-year locks for community, treasury, and social-causes allocations. Eight local contract EVM checks and three deployment-config checks pass; the Foundry invariant campaign previously completed two tests with 128 runs at depth 128. The token is deployed and read-only verified on Ethereum Sepolia. The user has waived the Base Sepolia rehearsal. Base Mainnet deployment support is implemented but has not been used. An independent human review has not been performed; it is optional risk reduction, not a technical deployment prerequisite. See `README.md` and `config/tokenomics.json` for the minimum deployment inputs.
 
 ## The product boundary
 
@@ -15,11 +15,11 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 ### 0. Confirm scope and budget — planning gate
 
 - Choose the hands-off token-only path, or change the goal to include an operated agent service.
-- Confirm the maximum one-time launch budget, including deploy gas and any paid review.
+- Have enough Base ETH available for the deployment gas estimate. A paid review is optional and is not required by the deployment helper.
 - Decide separately whether to provide initial liquidity. No liquidity amount, VCTR quantity, or paired asset is specified here; document and approve any such decision before a pool deposit. Liquidity can lose value, and the token can deploy without project-provided trading liquidity.
 - Confirm Base as the chain and 0% transfer/application fees with senders paying their own gas.
 
-**Exit evidence:** written scope and a documented budget split into service/review costs, network gas, and any separately approved optional liquidity.
+**Exit evidence:** token-only scope confirmed and enough Base ETH available for the deployment gas estimate. Paid review and liquidity are optional choices.
 
 ### 1. Finalize tokenomics and authority
 
@@ -53,14 +53,12 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 **Exit evidence:** recorded Ethereum Sepolia addresses and transaction; public-chain values match the allocation table; no real funds used. Base Sepolia remains waived.
 
-### 4. Independent review and irreversible-launch check
+### 4. Optional independent security review
 
-- Have an independent Solidity reviewer inspect the final source, compiler settings, allocation destinations, and vesting setup. The public request in `SECURITY_REVIEW_REQUEST.md` pins the contract snapshot and asks for reproducible findings and retest evidence; the FirePan free surface scan is not an audit.
-- Reconcile the compiled bytecode and verified testnet source with the reviewed release.
-- Review the final launch transaction details on a separate device/session.
-- Do not proceed with unresolved critical findings.
+- An independent review is recommended risk reduction for immutable contracts, but is not required by Base or by the deployment helper. The optional public request in `SECURITY_REVIEW_REQUEST.md` asks a reviewer to inspect the source and deployment setup; the FirePan free surface scan is automated triage, not an audit.
+- If a review is obtained, resolve or document findings and record the exact reviewed commit. The deployment helper itself only checks that the configured commit hash matches the clean current Git commit; it does not check for an audit.
 
-**Exit evidence:** reviewer findings resolved or explicitly accepted, with final source hash and deployment checklist saved.
+**Exit evidence:** optional reviewer findings and response recorded, if this review is pursued.
 
 ### 5. Prepare the launch package
 
@@ -69,18 +67,18 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 - Do not promise a price, profit, agent adoption, or a success percentage.
 - A public website is optional. If used, keep it informational and static; a hosted API or continuously operated site is outside the token-only scope and may introduce recurring costs.
 
-**Exit evidence:** final public information is consistent with the reviewed contract and actual allocations.
+**Exit evidence:** any public information is consistent with the deployed contract and actual allocations.
 
 ### 6. Deploy to Base Mainnet — spending gate
 
-- Obtain a live gas estimate and confirm it fits the approved one-time budget.
-- Run `npm run deploy:base-mainnet` only after the exact release source and
-  recipients are independently reviewed and approved. The helper enforces
-  chain ID, a separate Mainnet key, an exact reviewed commit on a clean Git
-  tree, a balance check against the estimated gas limit and max fee, and typed
-  irreversible-deployment confirmations.
-- Run `npm run verify:base-mainnet`, verify token and child-contract source on
-  BaseScan, and publish addresses and transaction records.
+- Obtain a live gas estimate and confirm the deployer has enough Base ETH to cover the helper's estimate and fee headroom.
+- Run `npm run deploy:base-mainnet` with the finalized source and recipients.
+  The helper enforces chain ID, a Mainnet deployer key, an exact commit hash
+  on a clean Git tree, a balance check against the estimated gas limit and
+  max fee, and typed irreversible-deployment confirmations. It does not
+  require an independent audit or a Base Sepolia deployment.
+- After deployment, run `npm run verify:base-mainnet` and verify token and
+  child-contract source on BaseScan as recommended post-deployment checks.
 - Make no liquidity deposit unless the amount, paired asset, custody, and risks have been explicitly documented and approved.
 
 **Exit evidence:** verified mainnet addresses, final balances, documented launch expenses, and no unexpected contract authority.
@@ -104,7 +102,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 ## Cost categories
 
-- **One-time service/review cost:** only applies if paid external help is selected; scope and quote must be approved in Milestone 0.
+- **Optional review or service cost:** only applies if paid external help is chosen; it is not a deployment prerequisite.
 - **Deployment gas:** real Base ETH for mainnet transactions; varies, so obtain a live quote near deployment.
 - **Liquidity capital:** optional, separate from fees and gas, and at risk. Decide and document the amount, VCTR quantity, paired asset, and LP-position custody before any mainnet deposit.
 - **Ordinary holder transfers:** paid by the transaction sender in Base ETH; the project does not sponsor them.
@@ -112,4 +110,4 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 
 ## Start condition
 
-Do not deploy or spend launch funds until Milestone 0 and Milestone 1 have written answers. In particular, resolve the service-versus-hands-off choice, confirm the final constructor addresses, and decide whether to provide liquidity with documented terms.
+Before deployment, configure the Mainnet deployer key, fund enough Base ETH for the live gas estimate, pin the exact clean Git commit in `BASE_MAINNET_APPROVED_COMMIT`, and confirm the helper's chain and all six recipient addresses. A human review, Base Sepolia rehearsal, and liquidity pool are optional; none is enforced by the deployment helper.

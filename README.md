@@ -76,21 +76,16 @@ forge test
 
 The invariant suite fuzzes transfers, delegated transfers, time advances, and lock claims, checking supply and balance conservation and the release schedules. The configured campaign uses 128 runs at depth 128. Tests are evidence about the tested code and scenarios; they are not a substitute for an independent security audit or a guarantee against unknown defects.
 
-## Base Mainnet go-live status
+## Base Mainnet deployment prerequisites
 
-| Launch item | Status | Details |
+This table tracks only what is needed to submit the Base Mainnet deployment transaction using the repository's helper. It does not include optional assurance or post-deployment publication work.
+
+| Required item | Status | Details |
 | --- | --- | --- |
-| Token code, fixed supply, and allocation locks | OK | Compiled and locally tested; the contracts have no owner, mint, pause, blacklist, or upgrade path. |
-| Deployment wallet addresses | OK | The user confirmed the final wallet inputs. Recheck the exact six addresses displayed by the deployment helper before the irreversible transaction. |
-| Local automated tests | OK | Eleven Node tests pass, and the Foundry invariant campaign was previously run with 128 runs at depth 128. Testing does not replace an independent audit. |
-| Ethereum Sepolia deployment and verification | OK | Public test deployment passed read-only checks. This does not test Base-specific RPC or explorer behavior. |
-| Base Sepolia rehearsal | Pending | Waived at the user's direction. The Base-specific testnet path remains unrehearsed; this gap is currently accepted and is not a go-live gate unless the decision changes. |
-| Independent human security review | Pending | No independent human audit is complete. The FirePan free surface scan is automated triage, not an audit. Review the exact source and deployment setup using the [security review request](SECURITY_REVIEW_REQUEST.md); resolve or explicitly accept findings. |
-| Reviewed release commit | Pending | After review and fixes, approve the exact clean Git commit and set `BASE_MAINNET_APPROVED_COMMIT` to its full hash. |
-| Dedicated Mainnet deployer and Base ETH | Pending | Configure `BASE_MAINNET_DEPLOYER_PRIVATE_KEY` locally and fund the dedicated deployer with enough Base ETH for the live deployment estimate. The helper has a default Base RPC; `BASE_MAINNET_RPC` can override it. Keep the key out of source control and chat. |
-| Base Mainnet deployment | Pending | Not deployed. Submit only after the review and release gates are complete, the live gas estimate is acceptable, and the helper's address, network, and irreversible-deployment confirmations are checked. |
-| Post-deployment checks and publication | Pending | Run `npm run verify:base-mainnet`, verify token and child-contract sources on BaseScan, and publish the final addresses, transaction, allocation, locks, and risk disclosures. |
-| Trading-pool liquidity | OK | Not required to deploy the token. The 1 billion VCTR allocation remains assigned to the reserve wallet; any pool funding is a separate optional decision. No INR liquidity budget is set. |
-| Direct-sale terms and public sale disclosures | Pending | Publish accurate terms before selling any tokens. Do not imply unsold tokens were sold or distributed, or promise price, profit, or adoption. |
+| Final deployment recipient addresses | OK | The user confirmed the final wallet inputs. Check all six addresses displayed by the helper before confirming; constructor recipients cannot be changed afterward. |
+| Clean Git release commit | Pending | Commit the final deployment source with a clean working tree and set `BASE_MAINNET_APPROVED_COMMIT` to that exact full commit hash. The helper enforces this release pin; it does not verify that an independent audit occurred. |
+| Base Mainnet deployer key | Pending | Set `BASE_MAINNET_DEPLOYER_PRIVATE_KEY` locally and keep it out of source control and chat. The helper has a default Base RPC; `BASE_MAINNET_RPC` is an optional override. |
+| Sufficient Base ETH for gas | Pending | Fund the deployer with enough Base ETH to cover the helper's live estimate and fee headroom. Actual gas is determined at deployment time. |
+| Deployment confirmations and transaction | Pending | The helper checks chain ID 8453 and requires typed confirmation of all recipient addresses, Base Mainnet, and the irreversible deployment before submission. |
 
-There is no Mainnet deployment yet. Independent review and the Base-specific testnet rehearsal remain outstanding; the latter was explicitly waived. Liquidity decisions, sale terms, and any future AI-agent services are separate from deploying the token and must be documented independently. The optional `local_tool` FastAPI app is an arithmetic-only allocation checker; it does not connect to a blockchain or affect contract behavior.
+An independent human review, Base Sepolia rehearsal, and liquidity pool are **not prerequisites enforced by Base or this deployment helper**. The Base Sepolia rehearsal was waived. Review and post-deployment verification remain prudent, but are separate from the minimum transaction prerequisites above. A liquidity pool is optional; the 1 billion VCTR allocation remains assigned to its reserve wallet. If tokens are sold, publish accurate sale terms before the sale. The optional `local_tool` FastAPI app is an arithmetic-only allocation checker; it does not connect to a blockchain or affect contract behavior.
