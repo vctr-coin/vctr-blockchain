@@ -17,7 +17,7 @@
       "percentage": "10",
       "amount_tokens": "1000000000",
       "destination_wallet": "0x8A4d5a891172EE81a3eb60343A5D15847c19aBDF",
-      "rule_now": "Only the amount actually needed for the initial pool may be deposited. Keep the rest in a separate liquidity-reserve wallet."
+      "rule_now": "This allocation is held in the liquidity-reserve wallet. Creating or funding a trading pool is optional and separate from token deployment; no pool amount or paired asset is specified or authorized by this allocation alone."
     },
     {
       "name": "Direct sales",
@@ -76,13 +76,6 @@
     "start": "The token deployment block timestamp.",
     "release": "After the 3-year cliff, each named beneficiary may claim its full allocation from its separate immutable timelock. No admin or early release exists."
   },
-  "liquidity_budget": {
-    "amount_inr": "5000",
-    "status": "tentative_at_risk_capital",
-    "reconfirm_before_pool_deployment": true,
-    "mainnet_vctr_pool_amount": null,
-    "note": "This is a tentative rupee budget, not an approved deposit or a fixed VCTR amount. Reconfirm the budget and pool parameters at actual Base Mainnet pool deployment."
-  },
   "status": "draft_tokenomics_wallets_and_vesting_schedule_recorded_review_pending",
-  "wallet_address_note": "The user reports verifying all six supplied addresses against their intended MetaMask accounts. Recheck the exact constructor values at deployment; deployed token allocation destinations cannot be changed."
+  "wallet_address_note": "The user has confirmed the final deployment wallet inputs. Recheck the exact constructor values immediately before deployment; deployed token allocation destinations cannot be changed."
 }

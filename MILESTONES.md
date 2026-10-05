@@ -19,7 +19,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 - Decide separately whether to provide initial liquidity. No liquidity amount, VCTR quantity, or paired asset is specified here; document and approve any such decision before a pool deposit. Liquidity can lose value, and the token can deploy without project-provided trading liquidity.
 - Confirm Base as the chain and 0% transfer/application fees with senders paying their own gas.
 
-**Exit evidence:** written scope and a rupee budget split into service/review costs, network gas, and optional at-risk liquidity.
+**Exit evidence:** written scope and a documented budget split into service/review costs, network gas, and any separately approved optional liquidity.
 
 ### 1. Finalize tokenomics and authority
 
@@ -28,7 +28,7 @@ This version does not include an agent API, hosted marketplace, revenue collecti
 - Define every allocation and destination wallet before deployment. Specify the initial distribution and what happens to any unsold allocation.
 - Implement the specified founder lock: transfer all 3 billion founder tokens to a vesting contract at token launch; no release for 15 × 365 days; then continuous linear vesting across the following 5 × 365 days, averaging about 50 million per month; no discretionary early release. The beneficiary claims accrued tokens.
 - Lock 500 million community, 1 billion treasury, and 1.5 billion social-causes allocations in separate contracts until 3 × 365 days after token deployment; each beneficiary may claim its full allocation after the cliff.
-- Follow the stated current rules: deposit only the amount actually needed for the initial pool and hold the remainder in a separate liquidity reserve; keep sale inventory in Seller and publish terms before sales; do not state that unsold sale tokens were sold, treat treasury tokens as operating cash, or assign donation value to social-cause tokens.
+- Keep the liquidity allocation in its reserve wallet. A trading-pool deposit is optional and separate from token deployment; if one is considered later, document the amount, paired asset, custody, and risks first. Keep sale inventory in Seller and publish terms before sales; do not state that unsold sale tokens were sold, treat treasury tokens as operating cash, or assign donation value to social-cause tokens.
 - Confirm that the deployed token has no administrator and cannot be changed or paused. Lost keys, allocation mistakes, and contract bugs will not have an admin recovery path.
 
 **Exit evidence:** supply table adds up exactly; all wallets and founder-lock terms are approved and recorded.
