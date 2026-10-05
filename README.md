@@ -87,7 +87,8 @@ separate readiness item before a Base Mainnet release.
 ## Remaining before Mainnet
 
 - Complete an independent Solidity review of the final source and resolve or
-  explicitly accept all findings.
+  explicitly accept all findings. The public [review request](SECURITY_REVIEW_REQUEST.md)
+  pins the current contract scope and lists requested evidence.
 - Deploy and verify the reviewed token and child-contract sources on Base
   Sepolia, or explicitly document the risks accepted if that rehearsal is
   skipped.
