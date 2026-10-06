@@ -1,6 +1,6 @@
 # VCTR AI Token
 
-![VCTR token logo](assets/vctr-logo.png)
+<img src="assets/vctr-logo.png" alt="VCTR token logo" width="256" height="256">
 
 VCTR AI Token is a fixed-supply ERC-20 designed for deployment on Base. Its product vision is to support an autonomous AI-to-AI economy where agents can pay for compute and license vector embeddings or synthetic datasets, with the potential for very small payments and machine-readable settlement.
 
