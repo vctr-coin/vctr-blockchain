@@ -1,0 +1,19 @@
+{
+  "network": "Base Mainnet",
+  "chain_id": 8453,
+  "sale_contract": "0x2E632f94785499a4a9bcf008F5286CA0a8DD3aAC",
+  "vctr_token": "0xA6cFE683cC1886A2dcb1f403F906C0615befbCDc",
+  "usdc_token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "seller": "0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc",
+  "price_usdc_per_vctr": "0.018095",
+  "price_micro_usdc_per_vctr": "18095",
+  "minimum_purchase_vctr": "100",
+  "maximum_successful_purchases": "3000000",
+  "maximum_sale_vctr": "3000000000",
+  "inventory_funding_required_before_sale": "3000000000 VCTR",
+  "deployer": "0xE67189b9C5f4E672628808B51487e37C755b40b1",
+  "transaction_hash": "0x3b7b80700ee8b056c80bb58bc5eff57f51a347961b88e2abbfa836cf943f692a",
+  "block_number": 52520501,
+  "approved_commit": "bf1b59a2e0778d762c212a69733134d199197156",
+  "inventory_funded": false
+}
