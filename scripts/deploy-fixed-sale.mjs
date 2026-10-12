@@ -107,6 +107,36 @@ if (process.argv.includes("--check")) {
   process.exit(0);
 }
 
+if (process.argv.includes("--check-signer")) {
+  const privateKey = readLocalEnv("BASE_MAINNET_DEPLOYER_PRIVATE_KEY");
+  if (!privateKey || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    throw new Error("Set BASE_MAINNET_DEPLOYER_PRIVATE_KEY in the ignored local .env; never paste it into chat or source control.");
+  }
+  const deployer = new Wallet(privateKey, provider);
+  if (getAddress(deployer.address) !== expectedDeployer) {
+    throw new Error(`Wrong deployment account: expected previously confirmed ${expectedDeployer}, found ${deployer.address}. No transaction was sent.`);
+  }
+  await import("./compile.mjs");
+  const artifact = JSON.parse(fs.readFileSync(path.join(root, "artifacts/solc/VCTRFixedSale.json"), "utf8"));
+  const factory = new ContractFactory(artifact.abi, artifact.evm.bytecode.object, deployer);
+  const unsigned = await factory.getDeployTransaction(...fixedSaleConstructorArgs());
+  const gasEstimate = await provider.estimateGas({ ...unsigned, from: deployer.address });
+  const feeData = await provider.getFeeData();
+  const maxFeePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
+  if (maxFeePerGas === null) throw new Error("Could not estimate Base Mainnet gas price.");
+  const gasLimit = (gasEstimate * 120n) / 100n;
+  const maxCost = gasLimit * maxFeePerGas;
+  const balance = await provider.getBalance(deployer.address);
+  process.stdout.write(`Signer check passed: ${deployer.address} matches the previously confirmed Base deployer.\n`);
+  process.stdout.write(`Base ETH available: ${formatEther(balance)}.\n`);
+  process.stdout.write(`Estimated gas: ${gasEstimate}; limit with 20% headroom: ${gasLimit}.\n`);
+  process.stdout.write(`Maximum estimated deployment cost at the current fee quote: ${formatEther(maxCost)} Base ETH.\n`);
+  if (balance < maxCost) throw new Error("Signer balance is below the estimated deployment cost; no transaction was sent.");
+  process.stdout.write("Signer-preflight mode: no signature was created and no transaction was sent.\n");
+  await provider.destroy();
+  process.exit(0);
+}
+
 if (fs.existsSync(reportPath)) {
   throw new Error(`Refusing to deploy because the report already exists: ${reportPath}`);
 }

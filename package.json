@@ -11,6 +11,7 @@
     "deploy:ethereum-sepolia": "DEPLOY_NETWORK=ethereum-sepolia node scripts/deploy-vctr.mjs",
     "deploy:base-mainnet": "DEPLOY_NETWORK=base-mainnet node scripts/deploy-vctr.mjs",
     "check:fixed-sale": "node scripts/deploy-fixed-sale.mjs --check",
+    "check:fixed-sale-signer": "node scripts/deploy-fixed-sale.mjs --check-signer",
     "deploy:fixed-sale": "node scripts/deploy-fixed-sale.mjs",
     "verify:fixed-sale": "node scripts/verify-fixed-sale.mjs",
     "verify:ethereum-sepolia": "VERIFY_NETWORK=ethereum-sepolia node scripts/verify-deployment.mjs",
