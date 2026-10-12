@@ -32,11 +32,21 @@ The contracts are immutable after deployment. There is no administrator or recov
 
 The allocations sum to exactly 10 billion VCTR. Constructor recipients are fixed at deployment and cannot be changed. Locked tokens are not transferred automatically: the relevant beneficiary must call `release()` after the applicable schedule permits it. The token accepts positive transfer amounts down to 1 wei and rejects zero-value `transfer` and `transferFrom` calls. A pool or liquidity budget is **not required** to deploy the token; any later pool funding is a separate, optional decision.
 
+## Fixed-price direct sale (prepared; not deployed)
+
+The separate `VCTRFixedSale` contract is designed for Base Mainnet and has no owner, upgrade, manual pause, or early-close function. Its immutable sale terms are 0.018095 native Base USDC per whole VCTR, a 100 VCTR minimum, a limit of 3,000,000 successful purchase calls, and a maximum of 3,000,000,000 VCTR sold. The sale closes permanently when either limit is reached. Failed or reverted calls do not count. Purchases must be integer VCTR amounts; fractional VCTR purchases are not supported.
+
+The full 3 billion VCTR inventory must be transferred from the Seller wallet to the sale contract before the first purchase; purchases revert unless the full remaining inventory is present. USDC is forwarded directly to the Seller wallet. If the purchase-call limit closes the sale before all tokens sell, remaining escrowed VCTR is automatically returned to the Seller wallet. Buyers must approve the sale contract to spend their USDC before calling `buy`; approve only the amount they intend to pay. No sale website or purchase UI is included. Do not transfer USDC directly to the sale contract because it has no recovery function.
+
+The intended Base Mainnet addresses are VCTR `0xA6cFE683cC1886A2dcb1f403F906C0615befbCDc`, native Circle USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`, and Seller `0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc`. These are pinned by the deployment preflight. Circle publishes the native Base USDC address on its [Base USDC page](https://www.circle.com/multi-chain-usdc/base). The contract source and deployment tooling are prepared, but no sale contract is claimed as deployed and no sale should be advertised until deployment, full inventory funding, and on-chain balance verification are complete.
+
+At exactly 100 VCTR per purchase, 3 million successful purchases sell 300 million VCTR; larger purchases can reach the 3 billion VCTR cap sooner. The maximum gross payment if all 3 billion VCTR sell at the fixed price is 54,285,000 USDC. This contract does not create or fund a liquidity pool.
+
 ## Network and deployment status
 
-VCTR has been deployed and read-only verified on **Ethereum Sepolia**, a public test network, at `0xB43557D42e54875D1526A35317727dE338dfD2ee`. The transaction is [`0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82`](https://sepolia.etherscan.io/tx/0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82). The [deployment report](deployments/ethereum-sepolia.json) records the vesting contract, allocation locks, recipients, and unlock times.
+VCTR is deployed on **Base Mainnet** (chain ID `8453`) at [`0xA6cFE683cC1886A2dcb1f403F906C0615befbCDc`](https://basescan.org/address/0xA6cFE683cC1886A2dcb1f403F906C0615befbCDc). The deployment transaction is [`0xadabc9c93d10bfddf2fb3bb385119f5eefe4a18712e069ac4dcbabd5a8ff720f`](https://basescan.org/tx/0xadabc9c93d10bfddf2fb3bb385119f5eefe4a18712e069ac4dcbabd5a8ff720f), in block `52220907`. The [Base Mainnet deployment report](deployments/base-mainnet.json) records the vesting contract, allocation locks, recipients, and unlock times. The token was also deployed and read-only verified on **Ethereum Sepolia**, a public test network, at `0xB43557D42e54875D1526A35317727dE338dfD2ee`; its transaction is [`0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82`](https://sepolia.etherscan.io/tx/0xd35fc512a6d22f0c5d6184440c7695210e7ce006bd934d67cef8272812197e82). The [Sepolia deployment report](deployments/ethereum-sepolia.json) records its contracts and allocation details.
 
-Ethereum Sepolia is not Base. The project has chosen to waive a Base Sepolia rehearsal. As a result, Base-specific testnet RPC and explorer behavior has not been rehearsed. Base Mainnet deployment support exists but has **not** been used; no VCTR Mainnet address is being claimed here. Base documents chain ID `8453` for Mainnet in its [`eth_chainId` reference](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId).
+Ethereum Sepolia is not Base. The project has chosen to waive a Base Sepolia rehearsal, so Base-specific testnet RPC and explorer behavior has not been rehearsed. Base documents chain ID `8453` for Mainnet in its [`eth_chainId` reference](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId).
 
 The deployment helper supports Ethereum Sepolia, Base Sepolia, and Base Mainnet:
 
@@ -69,6 +79,8 @@ pnpm install --frozen-lockfile
 pnpm run compile:contracts
 pnpm run test:evm
 ```
+
+After the sale source is reviewed and merged into a clean `main` release commit, `pnpm run check:fixed-sale` performs read-only Base Mainnet checks for the chain, VCTR and native USDC addresses and metadata, Seller address, and full Seller inventory. `pnpm run deploy:fixed-sale` repeats these checks, requires the reviewed commit pin and matching previously confirmed deployer account, estimates gas, displays all immutable constructor values, and asks for typed account, network, and irreversible-deployment confirmations. Deployment alone does not fund the sale; the Seller must then transfer the full 3 billion VCTR inventory and verify it on BaseScan before purchases can succeed.
 
 The Node EVM suite runs against a temporary local chain with simulated accounts, balances, and time. It does not send transactions to a public network or spend real ETH. The Foundry invariant suite requires Foundry:
 

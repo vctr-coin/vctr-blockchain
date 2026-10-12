@@ -7,6 +7,7 @@ const sourceFiles = [
   "contracts/VCTRToken.sol",
   "contracts/FounderVesting.sol",
   "contracts/AllocationTimelock.sol",
+  "contracts/VCTRFixedSale.sol",
 ];
 const sources = Object.fromEntries(
   sourceFiles.map((file) => [file, { content: fs.readFileSync(path.join(root, file), "utf8") }]),

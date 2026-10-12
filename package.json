@@ -10,6 +10,9 @@
     "deploy:base-sepolia": "DEPLOY_NETWORK=base-sepolia node scripts/deploy-vctr.mjs",
     "deploy:ethereum-sepolia": "DEPLOY_NETWORK=ethereum-sepolia node scripts/deploy-vctr.mjs",
     "deploy:base-mainnet": "DEPLOY_NETWORK=base-mainnet node scripts/deploy-vctr.mjs",
+    "check:fixed-sale": "node scripts/deploy-fixed-sale.mjs --check",
+    "deploy:fixed-sale": "node scripts/deploy-fixed-sale.mjs",
+    "verify:fixed-sale": "node scripts/verify-fixed-sale.mjs",
     "verify:ethereum-sepolia": "VERIFY_NETWORK=ethereum-sepolia node scripts/verify-deployment.mjs",
     "verify:base-sepolia": "VERIFY_NETWORK=base-sepolia node scripts/verify-deployment.mjs",
     "verify:base-mainnet": "VERIFY_NETWORK=base-mainnet node scripts/verify-deployment.mjs"
