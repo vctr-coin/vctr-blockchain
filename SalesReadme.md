@@ -1,6 +1,6 @@
 # VCTR Direct-Sale Contract
 
-Status: locally implemented and tested only. No Base Sepolia or Base Mainnet deployment, fork test, RPC call, or wallet transaction was performed. This is not an independent security audit or tax opinion.
+This document describes the intended behavior of the separate, non-upgradeable VCTR sale contract. Confirm the actual network and contract addresses against the deployment record and verified explorer source before interacting with a deployed instance. This document is not an independent security audit or tax opinion.
 
 The sale is a separate, non-upgradeable contract. It does not change the existing VCTR token or restrict ordinary VCTR transfers outside this contract.
 
@@ -8,7 +8,7 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 
 | Rule | Contract behavior |
 | --- | --- |
-| Payment asset | Constructor-fixed ERC-20 with 6 decimals, intended to be Circle test USDC on Base Sepolia during a separately approved test deployment. |
+| Payment asset | Constructor-fixed ERC-20 with 6 decimals. The exact USDC contract address is fixed at deployment and must be checked on the selected network. |
 | Sale token | Constructor-fixed ERC-20 with 18 decimals, intended to be VCTR. |
 | Fixed price | 0.018095 USDC per whole VCTR (`18,095` USDC micro-units). Price cannot be changed after deployment. |
 | Minimum order | 100 whole VCTR. Fractional VCTR orders are rejected. No per-order maximum. |
@@ -29,7 +29,7 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 | Identity data | Contract stores no identity documents, ID numbers, IP addresses, or encrypted identity data. Wallet, purchase, split, and reference data remain public on-chain. |
 | Code upgrades | No proxy or general upgrade function. Fixed price, cap, token addresses, Seller, and Project Treasury signer cannot be changed. |
 
-The three configured signers (Seller, Project Treasury signer, and purchase authorization signer) must be distinct EOAs. The Project Treasury signing address must be an account capable of ECDSA signing; a lock contract address cannot sign this control message. The two payout addresses must be nonzero and distinct. Test/deployment address inputs have not been selected in this local-only work.
+The three configured signers (Seller, Project Treasury signer, and purchase authorization signer) must be distinct EOAs. The Project Treasury signing address must be an account capable of ECDSA signing; a lock contract address cannot sign this control message. The two payout addresses must be nonzero and distinct. Confirm every configured address and chain before signing or submitting a transaction.
 
 ## Payment split and rounding
 
@@ -89,7 +89,7 @@ from eth_account.messages import encode_typed_data
 DOMAIN = {
     "name": "VCTR Direct Sale",
     "version": "1",
-    "chainId": chain_id,                 # Read from the connected local/test chain.
+    "chainId": chain_id,                 # Read from the connected chain.
     "verifyingContract": sale_address,  # Verify against the deployed address.
 }
 
@@ -195,14 +195,3 @@ def sign_control(account, action_hash, onchain_control_nonce, deadline, data_has
 ```
 
 `action_hash` must be read from `controlActionHashes()`. Use zero `dataHash` for pause, resume, and termination. For signer rotation, use `keccak256(abi.encode(newSigner, effectiveAt))`. For USDC/VCTR recovery, use `keccak256(abi.encode(amount, sellerAddress))`. Fetch the current `controlNonce` immediately before signing. Both signatures must use the same action, nonce, deadline, and data hash. Submit the corresponding contract function with both signatures before the deadline. Build and inspect each transaction with the exact ABI; do not guess selectors or encode with a stale ABI.
-
-## Local verification
-
-Compile and run the offline EVM tests from this repository:
-
-```sh
-node scripts/compile.mjs
-node --test tests/*.test.mjs
-```
-
-The sale test suite uses temporary Ganache chain ID 31337 and mock ERC-20s. It does not connect to Base Sepolia or Base Mainnet. The current suite covers initial terms/quote, staged inventory and paused withdrawals, authorized purchase and two-way TDS/Sales payouts, invalid/expired/replayed permits, sale and inventory caps, pause/resume dual approval, termination and token return, delayed TDS-policy schedule/cancel/activation, EIP-712 digest compatibility, signer rotation, stray-token recovery, payment failure rollback, and constructor validation. Local success does not replace independent review, provider integration tests, or later testnet rehearsal.
