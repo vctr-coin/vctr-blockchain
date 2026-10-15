@@ -5,6 +5,7 @@ import solc from "solc";
 const root = process.cwd();
 const sourceFiles = [
   "contracts/VCTRToken.sol",
+  "contracts/VCTRSale.sol",
   "contracts/FounderVesting.sol",
   "contracts/AllocationTimelock.sol",
 ];
