@@ -1,0 +1,26 @@
+{
+  "network": "Base Mainnet",
+  "chain_id": 8453,
+  "sale_contract_address": "0xAC74428003b8A4a90381Ad29217f6a6DFBF116D1",
+  "deployment_transaction_hash": "0xffd0a332b8b5151d4483af0d3762a4a629a16324586c56ebcbb8151e89855dfc",
+  "deployment_block": 52643907,
+  "deployer": "0xE67189b9C5f4E672628808B51487e37C755b40b1",
+  "constructor": {
+    "vctr": "0xA6cFE683cC1886A2dcb1f403F906C0615befbCDc",
+    "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "seller": "0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc",
+    "project_treasury_signer": "0x822b4D5711740A3Ee3d1F30C3Eeb06b794537767",
+    "authorization_signer": "0x7b6153688fAa5B4AedaA6E2aF7ad012945ACC9D9",
+    "tds_wallet": "0xfe979c23184b498bbaBa5144e466761263e58737",
+    "sales_wallet": "0x7c98B0aF272Ae8e2f51bC16AaF19a82f6F2248cc"
+  },
+  "immutable_sale_terms": {
+    "price_usdc_micro_per_vctr": "18095",
+    "minimum_vctr": "100000000000000000000",
+    "max_vctr": "3000000000000000000000000000",
+    "max_successful_purchases": "30000000",
+    "initial_tds_bps": "100"
+  },
+  "initial_inventory_funded": false,
+  "note": "Sale contract deployed. Source verification and inventory funding are separate steps; do not announce sales before both are complete."
+}

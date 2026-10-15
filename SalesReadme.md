@@ -37,7 +37,11 @@ The sale contract is a separate deployment from the already deployed VCTR token.
 
 The deployment script is not permission to launch sales. Before accepting purchases, implement and security-test the permit-authorization backend, independently review the release and exact constructor values, deploy and verify the sale contract, then have Seller approve the sale contract for exactly the intended initial amount and call `fundInventory`. No inventory funding is performed by the deployment command. Keep each step and transaction hash in the deployment record. A successful deployment with no funded inventory cannot complete purchases; direct USDC transfers to the sale contract are not purchases and require dual-approved recovery.
 
-As of this document revision, the sale contract has not been deployed and no sale inventory has been funded. Base Sepolia rehearsal has not been performed. Do not treat a local EVM test as a network deployment or independent audit. Replace this status only after checking the public Base transaction and deployed contract state.
+### Deployment record
+
+The sale contract was deployed on Base Mainnet (chain ID 8453) at [`0xAC74428003b8A4a90381Ad29217f6a6DFBF116D1`](https://basescan.org/address/0xAC74428003b8A4a90381Ad29217f6a6DFBF116D1) in block `52643907`. Deployment transaction: [`0xffd0a332b8b5151d4483af0d3762a4a629a16324586c56ebcbb8151e89855dfc`](https://basescan.org/tx/0xffd0a332b8b5151d4483af0d3762a4a629a16324586c56ebcbb8151e89855dfc). The deployment script read back and matched the VCTR, native USDC, Seller, Treasury signer, authorization signer, payout wallets, price, minimum order, and both sale caps.
+
+The deployment is **not yet operational for sales**: no VCTR inventory has been funded, and the permit-authorization backend is not yet implemented. Source verification on BaseScan and inventory funding are separate pending actions. Base Sepolia rehearsal has not been performed. Local EVM tests are not a network deployment or an independent audit. Do not announce or accept sales until the source is verified, the backend is implemented and tested, and Seller intentionally approves and funds inventory.
 
 ## Payment split and rounding
 
