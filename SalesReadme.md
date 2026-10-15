@@ -8,7 +8,7 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 
 | Rule | Contract behavior |
 | --- | --- |
-| Payment asset | Constructor-fixed ERC-20 with 6 decimals. The exact USDC contract address is fixed at deployment and must be checked on the selected network. |
+| Payment asset | Circle native USDC on Base Mainnet (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`), constructor-fixed with 6 decimals. Do not substitute bridged USDbC or a testnet token. |
 | Sale token | Constructor-fixed ERC-20 with 18 decimals, intended to be VCTR. |
 | Fixed price | 0.018095 USDC per whole VCTR (`18,095` USDC micro-units). Price cannot be changed after deployment. |
 | Minimum order | 100 whole VCTR. Fractional VCTR orders are rejected. No per-order maximum. |
@@ -30,6 +30,14 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 | Code upgrades | No proxy or general upgrade function. Fixed price, cap, token addresses, Seller, and Project Treasury signer cannot be changed. |
 
 The three configured signers (Seller, Project Treasury signer, and purchase authorization signer) must be distinct EOAs. The Project Treasury signing address must be an account capable of ECDSA signing; a lock contract address cannot sign this control message. The two payout addresses must be nonzero and distinct. Confirm every configured address and chain before signing or submitting a transaction.
+
+## Mainnet deployment status and procedure
+
+The sale contract is a separate deployment from the already deployed VCTR token. The repository includes a Base Mainnet-only deployment command, `npm run deploy:sale:base-mainnet`. It checks the Base chain ID, configured deployer address, VCTR and native USDC bytecode and decimals, Seller inventory balance, constructor addresses, deployment gas balance, and a clean Git release commit. The command displays the full constructor configuration and requires typed address, network, and irreversible-deployment confirmations. Deployment alone does not move VCTR.
+
+The deployment script is not permission to launch sales. Before accepting purchases, implement and security-test the permit-authorization backend, independently review the release and exact constructor values, deploy and verify the sale contract, then have Seller approve the sale contract for exactly the intended initial amount and call `fundInventory`. No inventory funding is performed by the deployment command. Keep each step and transaction hash in the deployment record. A successful deployment with no funded inventory cannot complete purchases; direct USDC transfers to the sale contract are not purchases and require dual-approved recovery.
+
+As of this document revision, the sale contract has not been deployed and no sale inventory has been funded. Base Sepolia rehearsal has not been performed. Do not treat a local EVM test as a network deployment or independent audit. Replace this status only after checking the public Base transaction and deployed contract state.
 
 ## Payment split and rounding
 
