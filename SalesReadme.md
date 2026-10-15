@@ -17,9 +17,10 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 | Inventory | Seller deposits in stages through `fundInventory`. Only deposited/accounted VCTR is sellable. Total staged plus sold inventory cannot exceed 3 billion VCTR. |
 | Buyer authorization | Every purchase needs an unexpired EIP-712 permit signed by the configured authorization EOA. Permit is tied to buyer, exact quantities, unique reference, one-time nonce, deadline, and split-policy version. |
 | Permit lifetime | At most 10 minutes. Buyer submits and pays gas; caller must be the wallet named in the permit. |
-| Audit reference | Backend supplies a unique random `bytes32` reference per purchase. The reference is emitted publicly, contains no identity itself, and is separate from the one-use nonce. The off-chain reference-to-record mapping remains the backend’s responsibility. |
-| Initial allocation | TDS 1% of gross; income-tax reserve 30% of gross; surcharge 25% of the income-tax allocation; cess 4% of income-tax plus surcharge; residual wallet gets the remainder. |
-| Split and wallet changes | Seller may schedule new rates and five payout addresses no earlier than 30 days after scheduling. A pending schedule may be cancelled by Seller; anyone may activate it after its effective time. A purchase also activates a due schedule before checking its policy version. |
+| Audit reference | Backend generates a unique random `bytes32` reference for each verified purchase and saves its mapping to the protected verification record before issuing a permit. The reference is emitted publicly in `PurchaseCompleted`, contains no identity itself, and is separate from the one-use nonce. |
+| Initial payout policy | TDS wallet receives 1% of gross USDC; Sales wallet receives the remainder. Other taxes are not separately withheld or sent by this contract and require separate accounting/payment outside it. |
+| TDS and wallet changes | Seller may schedule a new TDS rate and two payout addresses no earlier than 30 days after scheduling. A pending schedule may be cancelled by Seller; anyone may activate it after its effective time. A purchase also activates a due schedule before checking its policy version. |
+| Inventory withdrawal | Seller may withdraw accounted unsold VCTR only while the sale is paused. Withdrawal does not reduce lifetime VCTR sold or reset the purchase counter. |
 | Pause/resume | Both Seller and Project Treasury signer must sign the same action, nonce, deadline, and contract domain. A paused sale rejects purchases. |
 | Termination | Both Seller and Project Treasury signer must approve. It permanently closes the sale and returns all VCTR held by the contract to Seller. Unsolicited USDC is recoverable separately with both signatures, including after closure, so USDC transfer issues cannot block termination. |
 | Automatic close | Sale permanently closes when either global limit is reached and emits `SaleClosedAtCap`. |
@@ -28,23 +29,20 @@ The sale is a separate, non-upgradeable contract. It does not change the existin
 | Identity data | Contract stores no identity documents, ID numbers, IP addresses, or encrypted identity data. Wallet, purchase, split, and reference data remain public on-chain. |
 | Code upgrades | No proxy or general upgrade function. Fixed price, cap, token addresses, Seller, and Project Treasury signer cannot be changed. |
 
-The three configured signers (Seller, Project Treasury signer, and purchase authorization signer) must be distinct EOAs. The Project Treasury signing address must be an account capable of ECDSA signing; a lock contract address cannot sign this control message. Initial payout addresses must be nonzero and distinct. Test/deployment address inputs have not been selected in this local-only work.
+The three configured signers (Seller, Project Treasury signer, and purchase authorization signer) must be distinct EOAs. The Project Treasury signing address must be an account capable of ECDSA signing; a lock contract address cannot sign this control message. The two payout addresses must be nonzero and distinct. Test/deployment address inputs have not been selected in this local-only work.
 
 ## Payment split and rounding
 
-USDC uses six decimal places. The contract computes each purchase in integer micro-USDC and floors each reserve amount for that purchase:
+USDC uses six decimal places. The contract computes each purchase in integer micro-USDC and floors the TDS amount per purchase:
 
 ```text
-TDS       = floor(gross × 100 / 10,000)
-IncomeTax = floor(gross × 3,000 / 10,000)
-Surcharge = floor(IncomeTax × 2,500 / 10,000)
-Cess      = floor((IncomeTax + Surcharge) × 400 / 10,000)
-Residual  = gross − TDS − IncomeTax − Surcharge − Cess
+TDS   = floor(gross × tdsBps / 10,000)
+Sales = gross − TDS
 ```
 
-At the minimum order of 100 VCTR, gross is 1.8095 USDC (1,809,500 micro-USDC). The amounts are 18,095 micro-USDC TDS; 542,850 income-tax reserve; 135,712 surcharge; 27,142 cess; and 1,085,701 residual. The residual receives all rounding remainder so distributions equal the buyer’s payment exactly.
+At the minimum order of 100 VCTR, gross is 1.8095 USDC (1,809,500 micro-USDC). At the initial 1% TDS rate, the TDS wallet receives 18,095 micro-USDC and the Sales wallet receives 1,791,405 micro-USDC. Sales receives all rounding remainder, so the two payouts equal the buyer’s payment exactly.
 
-At 30 million purchases of exactly 100 VCTR, the cumulative allocations are 542,850 USDC TDS; 16,285,500 income-tax reserve; 4,071,360 surcharge; 814,260 cess; and 32,571,030 residual. Total gross is 54,285,000 USDC. These per-purchase rounded totals differ slightly from applying percentages once to the aggregate. Different order sizes can produce different cumulative rounding.
+At 30 million purchases of exactly 100 VCTR, total gross is 54,285,000 USDC: 542,850 USDC goes to the TDS wallet and 53,742,150 USDC to the Sales wallet. Different order sizes can create small per-purchase rounding differences; the Sales transfer always receives the remainder.
 
 These are contract allocation settings, not a determination of tax owed, statutory withholding, or final LLP tax. Rates/bases must be approved by the LLP’s tax adviser before any production launch. A reserve transfer is not a tax payment or filing.
 
@@ -53,12 +51,13 @@ These are contract allocation settings, not a determination of tax owed, statuto
 | Function | Who may call | Effect / restriction |
 | --- | --- | --- |
 | `fundInventory(amount)` | Seller | Pulls whole VCTR into sale escrow; staged plus sold inventory cannot exceed the cap. Requires Seller approval to the sale contract. |
-| `quote(vctrAmount)` | Anyone, read-only | Returns exact USDC micro-units, five split amounts, and effective split version. Rejects below-minimum/fractional quantities. |
-| `buy(authorization, signature)` | Buyer named in permit | Validates signature/domain, permit deadline, exact price, policy version, unique nonce/reference, caps, pause/closure, and inventory; atomically collects and distributes USDC and transfers VCTR. |
-| `scheduleSplit(wallets, rates, effectiveAt)` | Seller | Schedules a bounded split and five new payout wallets at least 30 days ahead. Cannot change price or code. |
-| `cancelScheduledSplit()` | Seller | Cancels the not-yet-activated split schedule. |
-| `activateScheduledSplit()` | Anyone after effective time | Activates a previously announced split; purchase calls also activate a due schedule. |
-| `activeSplitConfig()` / `pendingSplitConfig()` | Anyone, read-only | Returns active or scheduled wallet/rate configuration and version/time. |
+| `withdrawInventory(amount)` | Seller while paused | Returns whole VCTR from accounted unsold inventory to Seller. Cannot withdraw during active sales or withdraw more than the accounted inventory. |
+| `quote(vctrAmount)` | Anyone, read-only | Returns exact gross USDC micro-units, TDS, Sales remainder, and effective policy version. Rejects below-minimum/fractional quantities. |
+| `buy(authorization, signature)` | Buyer named in permit | Validates signature/domain, permit deadline, exact price, policy version, unique nonce/reference, caps, pause/closure, and inventory; atomically collects and distributes USDC to TDS and Sales, then transfers VCTR. |
+| `scheduleSplit(wallets, tdsBps, effectiveAt)` | Seller | Schedules a TDS rate and two payout wallets at least 30 days ahead. Cannot change price or code. |
+| `cancelScheduledSplit()` | Seller | Cancels the not-yet-activated policy schedule. |
+| `activateScheduledSplit()` | Anyone after effective time | Activates a previously announced policy; purchase calls also activate a due schedule. |
+| `activeSplitConfig()` / `pendingSplitConfig()` | Anyone, read-only | Returns active or scheduled TDS wallet/rate configuration and version/time. |
 | `pause(deadline, sellerSig, treasurySig)` | Any relayer with both valid signatures | Pauses future sales; one signer alone is insufficient. |
 | `resume(deadline, sellerSig, treasurySig)` | Any relayer with both valid signatures | Resumes a paused, non-terminated sale. |
 | `terminate(deadline, sellerSig, treasurySig)` | Any relayer with both valid signatures | Permanently closes and returns all VCTR then held to Seller. Unsolicited USDC recovery is a separate dual-approved action so a USDC transfer failure cannot block termination. |
@@ -74,11 +73,11 @@ Direct USDC transfers cannot be blocked by this contract. They never deliver VCT
 
 ## Events
 
-The contract emits `InventoryFunded`, `PurchaseCompleted`, `SalePaused`, `SaleResumed`, `SaleTerminated`, `SaleClosedAtCap`, `SplitScheduled`, `SplitScheduleCancelled`, `SplitActivated`, `AuthorizationSignerChangeScheduled`, `AuthorizationSignerChanged`, `UnsolicitedUsdcRecovered`, and `UnsolicitedVctrRecovered`. Purchase events contain the public reference, buyer, amounts, policy version, and split amounts. The contract does not store an explorer transaction hash; index the event’s transaction hash and log index off-chain.
+The contract emits `InventoryFunded`, `InventoryWithdrawn`, `PurchaseCompleted`, `SalePaused`, `SaleResumed`, `SaleTerminated`, `SaleClosedAtCap`, `SplitScheduled`, `SplitScheduleCancelled`, `SplitActivated`, `AuthorizationSignerChangeScheduled`, `AuthorizationSignerChanged`, `UnsolicitedUsdcRecovered`, and `UnsolicitedVctrRecovered`. Purchase events contain the public reference, buyer, amounts, policy version, TDS, and Sales payout. The contract does not store an explorer transaction hash; index the event’s transaction hash and log index off-chain.
 
 ## Python application integration draft
 
-Use a separate FastAPI backend for identity-provider checks, records, and permit signing. The Python/web/mobile client must not contain the backend authorization private key or both admin signing keys. Keep Seller and Project Treasury approval in separate signing devices/workflows. Treat provider callbacks and request IDs as untrusted until authenticated and matched server-side. Store the reference-to-record map durably and securely before issuing a permit.
+Use a separate FastAPI backend for identity-provider checks, records, and permit signing. The Python/web/mobile client must not contain the backend authorization private key or either admin signing key. Keep Seller and Project Treasury approval in separate signing devices/workflows. Treat provider callbacks and request IDs as untrusted until authenticated and matched server-side. Persist the reference-to-record map securely before issuing a permit.
 
 Install compatible `web3.py` and `eth-account` versions in the consuming application. The ABI can be generated from the local Solidity artifact after compile. The following illustrates EIP-712 payload construction; it intentionally has no RPC URL, private key, or deployment address.
 
@@ -139,7 +138,7 @@ def make_purchase_permit(backend_signer, buyer, whole_vctr, quote, version, chai
     return message, signature
 ```
 
-The backend first reads `sale.functions.quote(whole_vctr * 10**18).call()`; quote fields 0 and 6 are gross USDC micro-units and policy version. The backend returns the permit and signature to the verified buyer. A wallet flow then approves the exact `usdcAmount` to the sale contract and submits `buy(permit_tuple, signature)` from the permit’s buyer address. A Python service can prepare the unsigned calls without holding the buyer key:
+The backend first reads `sale.functions.quote(whole_vctr * 10**18).call()`; quote fields 0 and 3 are gross USDC micro-units and policy version (fields 1 and 2 are TDS and Sales amounts). Pass the gross quote in `quote["gross_usdc_micro"]` to the example. The backend returns the permit and signature to the verified buyer. A wallet flow then approves the exact `usdcAmount` to the sale contract and submits `buy(permit_tuple, signature)` from the permit’s buyer address. A Python service can prepare the unsigned calls without holding the buyer key:
 
 ```python
 buyer = permit["buyer"]
@@ -206,4 +205,4 @@ node scripts/compile.mjs
 node --test tests/*.test.mjs
 ```
 
-The sale test suite uses temporary Ganache chain ID 31337 and mock ERC-20s. It does not connect to Base Sepolia or Base Mainnet. The current suite covers initial terms/quote, staged inventory, authorized purchase and five-way split, invalid/expired/replayed permits, sale and inventory caps, pause/resume dual approval, termination and token return, delayed split schedule/cancel/activation, EIP-712 digest compatibility, signer rotation, stray-token recovery, payment failure rollback, and constructor validation. Local success does not replace independent review, provider integration tests, or later testnet rehearsal.
+The sale test suite uses temporary Ganache chain ID 31337 and mock ERC-20s. It does not connect to Base Sepolia or Base Mainnet. The current suite covers initial terms/quote, staged inventory and paused withdrawals, authorized purchase and two-way TDS/Sales payouts, invalid/expired/replayed permits, sale and inventory caps, pause/resume dual approval, termination and token return, delayed TDS-policy schedule/cancel/activation, EIP-712 digest compatibility, signer rotation, stray-token recovery, payment failure rollback, and constructor validation. Local success does not replace independent review, provider integration tests, or later testnet rehearsal.

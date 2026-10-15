@@ -119,8 +119,7 @@ async function timestamp() {
 }
 
 async function advanceTime(seconds) {
-  const target = (await timestamp()) + seconds;
-  await rpc.request({ method: "evm_setTime", params: [Number(target * 1000n)] });
+  await rpc.request({ method: "evm_increaseTime", params: [Number(seconds)] });
   await rpc.request({ method: "evm_mine", params: [] });
 }
 
@@ -173,7 +172,7 @@ async function deploySale({ vctrDecimals = 18, usdcDecimals = 6, payoutWallets =
   await vctr.waitForDeployment();
   usdc = await tokenFactory.deploy("USD Coin", "USDC", usdcDecimals);
   await usdc.waitForDeployment();
-  const walletsArg = payoutWallets ?? addresses.slice(4, 9);
+  const walletsArg = payoutWallets ?? addresses.slice(4, 6);
   const saleFactory = new ContractFactory(artifacts.sale.abi, artifacts.sale.evm.bytecode.object, signers[0]);
   sale = await saleFactory.deploy(vctr.target, usdc.target, addresses[1], addresses[2], addresses[3], walletsArg);
   await sale.waitForDeployment();
@@ -202,7 +201,7 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     await rpc.disconnect();
   });
 
-  it("sets fixed terms, initial split and six-decimal quote with residual dust conservation", async () => {
+  it("sets fixed terms, initial TDS policy, and exact two-wallet quote", async () => {
     assert.equal(await sale.PRICE_USDC_MICRO_PER_VCTR(), PRICE_MICRO);
     assert.equal(await sale.MIN_PURCHASE(), MIN_PURCHASE);
     assert.equal(await sale.MAX_SALE(), MAX_SALE);
@@ -212,23 +211,22 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     assert.equal(await sale.paused(), false);
     assert.equal(await sale.closed(), false);
     const config = await sale.activeSplitConfig();
-    assert.deepEqual(Array.from(config[0]), addresses.slice(4, 9));
-    assert.deepEqual(Array.from(config.slice(1, 5)), [100n, 3000n, 2500n, 400n]);
-    assert.equal(config[5], 1n);
+    assert.deepEqual(Array.from(config[0]), addresses.slice(4, 6));
+    assert.equal(config[1], 100n);
+    assert.equal(config[2], 1n);
     const quote = await sale.quote(MIN_PURCHASE);
-    assert.deepEqual(Array.from(quote.slice(0, 6)), [1_809_500n, 18_095n, 542_850n, 135_712n, 27_142n, 1_085_701n]);
-    assert.equal(quote[6], 1n);
-    assert.equal(quote.slice(1, 6).reduce((sum, amount) => sum + amount, 0n), quote[0]);
+    assert.deepEqual(Array.from(quote), [1_809_500n, 18_095n, 1_791_405n, 1n]);
+    assert.equal(quote[1] + quote[2], quote[0]);
     await assert.rejects(sale.quote(99n * UNIT));
     await assert.rejects(sale.quote(MIN_PURCHASE + 1n));
   });
 
-  it("stages inventory and atomically completes an authorized purchase with all five USDC allocations", async () => {
+  it("stages inventory and atomically completes an authorized purchase with TDS and Sales payouts", async () => {
     const amount = 100n * UNIT;
     const gross = 1_809_500n;
     await fundVctr(1_000n * UNIT);
     await prepareBuyer(gross);
-    const beforeBalances = await Promise.all(addresses.slice(4, 9).map((address) => usdc.balanceOf(address)));
+    const beforeBalances = await Promise.all(addresses.slice(4, 6).map((address) => usdc.balanceOf(address)));
     const { authorization, signature } = await makeAuthorization({ amount });
     const receipt = await (await sale.connect(signers[9]).buy(authorization, signature)).wait();
 
@@ -240,8 +238,8 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     assert.equal(await sale.usedNonces(authorization.nonce), true);
     assert.equal(await sale.usedReferences(authorization.referenceId), true);
     assert.deepEqual(
-      await Promise.all(addresses.slice(4, 9).map((address) => usdc.balanceOf(address))),
-      beforeBalances.map((balance, index) => balance + [18_095n, 542_850n, 135_712n, 27_142n, 1_085_701n][index]),
+      await Promise.all(addresses.slice(4, 6).map((address) => usdc.balanceOf(address))),
+      beforeBalances.map((balance, index) => balance + [18_095n, 1_791_405n][index]),
     );
     assert.equal(await usdc.balanceOf(sale.target), 0n);
     const purchaseLog = receipt.logs.map((log) => {
@@ -249,7 +247,22 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     }).find((log) => log?.name === "PurchaseCompleted");
     assert.ok(purchaseLog);
     assert.equal(purchaseLog.args.referenceId, authorization.referenceId);
-    assert.equal(purchaseLog.args.residualAmount, 1_085_701n);
+    assert.equal(purchaseLog.args.salesAmount, 1_791_405n);
+  });
+
+  it("allows Seller to withdraw only whole, accounted unsold VCTR while paused", async () => {
+    await fundVctr(500n * UNIT);
+    const sellerBefore = await vctr.balanceOf(addresses[1]);
+    await assert.rejects(sale.connect(signers[1]).withdrawInventory(100n * UNIT));
+    const pauseApproval = await dualApproval((await sale.controlActionHashes())[0]);
+    await (await sale.pause(pauseApproval.deadline, pauseApproval.sellerSignature, pauseApproval.treasurySignature)).wait();
+    await assert.rejects(sale.connect(signers[8]).withdrawInventory(100n * UNIT));
+    await assert.rejects(sale.connect(signers[1]).withdrawInventory(501n * UNIT));
+    await assert.rejects(sale.connect(signers[1]).withdrawInventory(1n));
+    await (await sale.connect(signers[1]).withdrawInventory(125n * UNIT)).wait();
+    assert.equal(await sale.accountedInventory(), 375n * UNIT);
+    assert.equal(await vctr.balanceOf(addresses[1]), sellerBefore + 125n * UNIT);
+    assert.equal(await vctr.balanceOf(sale.target), 375n * UNIT);
   });
 
   it("rejects unauthorized, altered, wrong-caller, under-minimum, fractional, and wrong-price purchases", async () => {
@@ -283,7 +296,10 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
 
     const first = await makeAuthorization({ referenceId: id("same-ref"), nonce: id("nonce-a") });
     await (await sale.connect(signers[9]).buy(first.authorization, first.signature)).wait();
-    await assert.rejects(sale.connect(signers[9]).buy(first.authorization, first.signature));
+    await assert.rejects(async () => {
+      const tx = await sale.connect(signers[9]).buy(first.authorization, first.signature);
+      await tx.wait();
+    });
     const duplicateRef = await makeAuthorization({ referenceId: id("same-ref"), nonce: id("nonce-b") });
     await assert.rejects(sale.connect(signers[9]).buy(duplicateRef.authorization, duplicateRef.signature));
     const zeroNonce = await makeAuthorization({ nonce: `0x${"00".repeat(32)}` });
@@ -321,7 +337,10 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
 
     await prepareBuyer(1_809_500n);
     const auth = await makeAuthorization({ amount: 1_100n * UNIT });
-    await assert.rejects(sale.connect(signers[9]).buy(auth.authorization, auth.signature));
+    await assert.rejects(async () => {
+      const tx = await sale.connect(signers[9]).buy(auth.authorization, auth.signature);
+      await tx.wait();
+    });
     assert.equal(await sale.totalSold(), 0n);
   });
 
@@ -337,7 +356,10 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     assert.equal(await sale.accountedInventory(), 0n);
     assert.equal(await vctr.balanceOf(addresses[9]), MAX_SALE);
     await assert.rejects(sale.connect(signers[1]).fundInventory(UNIT));
-    await assert.rejects(sale.connect(signers[9]).buy(auth.authorization, auth.signature));
+    await assert.rejects(async () => {
+      const tx = await sale.connect(signers[9]).buy(auth.authorization, auth.signature);
+      await tx.wait();
+    });
   });
 
   it("requires both Seller and Project Treasury signatures to pause and resume", async () => {
@@ -419,17 +441,20 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     await assert.rejects(sale.connect(signers[1]).fundInventory(UNIT));
   });
 
-  it("schedules, cancels, activates, and applies split changes only after 30 days", async () => {
-    const walletsNext = addresses.slice(3, 8);
+  it("schedules, cancels, activates, and applies TDS changes only after 30 days", async () => {
+    const walletsNext = addresses.slice(6, 8);
     const effectiveAt = (await timestamp()) + NOTICE + 120n;
-    await assert.rejects(sale.connect(signers[8]).scheduleSplit(walletsNext, 200, 1000, 5000, 1000, effectiveAt));
-    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 200, 1000, 5000, 1000, (await timestamp()) + NOTICE - 1n));
-    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 5000, 5000, 10000, 10000, effectiveAt));
-    await (await sale.connect(signers[1]).scheduleSplit(walletsNext, 200, 1000, 5000, 1000, effectiveAt)).wait();
-    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 200, 1000, 5000, 1000, effectiveAt + NOTICE));
+    await assert.rejects(sale.connect(signers[8]).scheduleSplit(walletsNext, 200, effectiveAt));
+    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 200, (await timestamp()) + NOTICE - 1n));
+    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 10_000, effectiveAt));
+    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 10_001, effectiveAt));
+    await (await sale.connect(signers[1]).scheduleSplit(walletsNext, 200, effectiveAt)).wait();
+    await assert.rejects(sale.connect(signers[1]).scheduleSplit(walletsNext, 200, effectiveAt + NOTICE));
     const pending = await sale.pendingSplitConfig();
     assert.equal(pending[0], true);
-    assert.equal(pending[6], effectiveAt);
+    assert.deepEqual(Array.from(pending[1]), walletsNext);
+    assert.equal(pending[2], 200n);
+    assert.equal(pending[3], effectiveAt);
     await assert.rejects(sale.activateScheduledSplit());
     await (await sale.connect(signers[1]).cancelScheduledSplit()).wait();
     assert.equal((await sale.pendingSplitConfig())[0], false);
@@ -439,14 +464,14 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     });
 
     const nextEffectiveAt = (await timestamp()) + NOTICE + 120n;
-    await (await sale.connect(signers[1]).scheduleSplit(walletsNext, 200, 1000, 5000, 1000, nextEffectiveAt)).wait();
+    await (await sale.connect(signers[1]).scheduleSplit(walletsNext, 200, nextEffectiveAt)).wait();
     await advanceTime(NOTICE + 3_600n);
     assert.ok((await timestamp()) >= nextEffectiveAt, `now=${await timestamp()} effective=${nextEffectiveAt}`);
     await (await sale.activateScheduledSplit({ gasLimit: 250_000n })).wait();
     const active = await sale.activeSplitConfig();
     assert.deepEqual(Array.from(active[0]), walletsNext);
-    assert.deepEqual(Array.from(active.slice(1, 5)), [200n, 1000n, 5000n, 1000n]);
-    assert.equal(active[5], 2n);
+    assert.equal(active[1], 200n);
+    assert.equal(active[2], 2n);
     await assert.rejects(sale.activateScheduledSplit());
 
     await fundVctr(1_000n * UNIT);
@@ -455,7 +480,7 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     const before = await Promise.all(walletsNext.map((address) => usdc.balanceOf(address)));
     await (await sale.connect(signers[9]).buy(auth.authorization, auth.signature)).wait();
     const after = await Promise.all(walletsNext.map((address) => usdc.balanceOf(address)));
-    assert.deepEqual(after.map((value, i) => value - before[i]), [36_190n, 180_950n, 90_475n, 27_142n, 1_474_743n]);
+    assert.deepEqual(after.map((value, i) => value - before[i]), [36_190n, 1_773_310n]);
   });
 
   it("binds quote and EIP-712 digests to this local chain and contract", async () => {
@@ -488,11 +513,19 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
       approval.treasurySignature,
     )).wait();
     assert.equal(await sale.authorizationSigner(), addresses[3]);
-    await assert.rejects(sale.activateAuthorizationSigner());
+    await assert.rejects(async () => {
+      const tx = await sale.activateAuthorizationSigner();
+      await tx.wait();
+    });
+    assert.equal(await sale.pendingAuthorizationSigner(), newSigner);
+    assert.equal(await sale.pendingAuthorizationSignerAt(), BigInt(effectiveAt));
     const oldPermit = await makeAuthorization({ signingWallet: wallets[3] });
     await (await sale.connect(signers[9]).buy(oldPermit.authorization, oldPermit.signature)).wait();
-    await advanceTime(NOTICE + 3_600n);
-    await (await sale.activateAuthorizationSigner()).wait();
+    const signerChangeAt = await sale.pendingAuthorizationSignerAt();
+    const currentTime = await timestamp();
+    await advanceTime((signerChangeAt > currentTime ? signerChangeAt - currentTime : 0n) + 3_600n);
+    assert.ok((await timestamp()) >= BigInt(effectiveAt));
+    await (await sale.activateAuthorizationSigner({ gasLimit: 250_000n })).wait();
     assert.equal(await sale.authorizationSigner(), newSigner);
     const oldAfterRotation = await makeAuthorization({ signingWallet: wallets[3] });
     await assert.rejects(sale.connect(signers[9]).buy(oldAfterRotation.authorization, oldAfterRotation.signature));
@@ -523,14 +556,19 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     assert.equal(await sale.successfulPurchaseCount(), 0n);
   });
 
-  it("rolls back the complete purchase if any USDC payout fails", async () => {
+  it("rolls back the complete purchase if either USDC payout fails", async () => {
     const amount = MIN_PURCHASE;
     await fundVctr(1_000n * UNIT);
     await prepareBuyer(1_809_500n);
-    await (await usdc.setBlocked(addresses[6], true)).wait();
     const auth = await makeAuthorization({ amount });
     const buyerUsdcBefore = await usdc.balanceOf(addresses[9]);
+
+    await (await usdc.setBlocked(addresses[4], true)).wait();
     await assert.rejects(sale.connect(signers[9]).buy(auth.authorization, auth.signature));
+    await (await usdc.setBlocked(addresses[4], false)).wait();
+    await (await usdc.setBlocked(addresses[5], true)).wait();
+    await assert.rejects(sale.connect(signers[9]).buy(auth.authorization, auth.signature));
+
     assert.equal(await sale.successfulPurchaseCount(), 0n);
     assert.equal(await sale.totalSold(), 0n);
     assert.equal(await sale.usedNonces(auth.authorization.nonce), false);
@@ -552,8 +590,8 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
   it("validates token decimals, distinct initial signers and distinct payout wallets", async () => {
     await assert.rejects(deploySale({ vctrDecimals: 6 }));
     await assert.rejects(deploySale({ usdcDecimals: 18 }));
-    const duplicateWallets = [...addresses.slice(4, 9)];
-    duplicateWallets[4] = duplicateWallets[3];
+    const duplicateWallets = [...addresses.slice(4, 6)];
+    duplicateWallets[1] = duplicateWallets[0];
     const tokenFactory = new ContractFactory(artifacts.mock.abi, artifacts.mock.evm.bytecode.object, signers[0]);
     const tokenA = await tokenFactory.deploy("VCTR", "VCTR", 18);
     const tokenB = await tokenFactory.deploy("USDC", "USDC", 6);
@@ -561,6 +599,6 @@ describe("VCTR direct sale on a temporary local EVM only", () => {
     await tokenB.waitForDeployment();
     const saleFactory = new ContractFactory(artifacts.sale.abi, artifacts.sale.evm.bytecode.object, signers[0]);
     await assert.rejects(saleFactory.deploy(tokenA.target, tokenB.target, addresses[1], addresses[2], addresses[3], duplicateWallets));
-    await assert.rejects(saleFactory.deploy(tokenA.target, tokenB.target, addresses[1], addresses[1], addresses[3], addresses.slice(4, 9)));
+    await assert.rejects(saleFactory.deploy(tokenA.target, tokenB.target, addresses[1], addresses[1], addresses[3], addresses.slice(4, 6)));
   });
 });

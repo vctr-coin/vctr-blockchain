@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @notice Fixed-price, permit-gated VCTR sale with delayed proceeds-policy changes.
+/// @notice Fixed-price, permit-gated VCTR sale with delayed TDS-policy changes.
 /// @dev No upgrade path. The Seller and Project Treasury jointly authorize pause,
 ///      resume, termination, signer rotation, and recovery of unsolicited tokens.
 contract VCTRSale is ReentrancyGuard {
@@ -69,11 +69,8 @@ contract VCTRSale is ReentrancyGuard {
     }
 
     struct SplitConfig {
-        address[5] wallets;
+        address[2] wallets;
         uint16 tdsBps;
-        uint16 incomeTaxBps;
-        uint16 surchargeBps;
-        uint16 cessBps;
     }
 
     struct ScheduledSplit {
@@ -88,6 +85,7 @@ contract VCTRSale is ReentrancyGuard {
     mapping(bytes32 referenceId => bool used) public usedReferences;
 
     event InventoryFunded(address indexed seller, uint256 amount, uint256 totalAccountedInventory);
+    event InventoryWithdrawn(address indexed seller, uint256 amount, uint256 totalAccountedInventory);
     event PurchaseCompleted(
         address indexed buyer,
         uint256 vctrAmount,
@@ -96,10 +94,7 @@ contract VCTRSale is ReentrancyGuard {
         bytes32 nonce,
         uint64 splitVersion,
         uint256 tdsAmount,
-        uint256 incomeTaxAmount,
-        uint256 surchargeAmount,
-        uint256 cessAmount,
-        uint256 residualAmount
+        uint256 salesAmount
     );
     event SalePaused(uint256 indexed controlNonce);
     event SaleResumed(uint256 indexed controlNonce);
@@ -160,7 +155,7 @@ contract VCTRSale is ReentrancyGuard {
         address seller_,
         address projectTreasurySigner_,
         address authorizationSigner_,
-        address[5] memory payoutWallets_
+        address[2] memory payoutWallets_
     ) {
         if (
             address(vctr_) == address(0) || address(usdc_) == address(0) || seller_ == address(0)
@@ -186,9 +181,6 @@ contract VCTRSale is ReentrancyGuard {
         authorizationSigner = authorizationSigner_;
         activeSplit.wallets = payoutWallets_;
         activeSplit.tdsBps = 100;
-        activeSplit.incomeTaxBps = 3_000;
-        activeSplit.surchargeBps = 2_500;
-        activeSplit.cessBps = 400;
     }
 
     /// @notice Seller stages VCTR inventory. Only deposited/accounted VCTR can be sold.
@@ -202,6 +194,17 @@ contract VCTRSale is ReentrancyGuard {
         emit InventoryFunded(msg.sender, amount, accountedInventory);
     }
 
+    /// @notice Seller may withdraw unsold accounted VCTR while sales are paused.
+    function withdrawInventory(uint256 amount) external onlySeller nonReentrant {
+        if (closed) revert SaleClosed();
+        if (!paused) revert NotPaused();
+        if (amount == 0 || amount > accountedInventory) revert InventoryInsufficient();
+        if (amount % TOKEN_UNIT != 0) revert FractionalVctrNotSupported();
+        accountedInventory -= amount;
+        vctr.safeTransfer(seller, amount);
+        emit InventoryWithdrawn(seller, amount, accountedInventory);
+    }
+
     /// @notice Returns the exact payment and split under the currently effective policy.
     function quote(uint256 vctrAmount)
         external
@@ -209,10 +212,7 @@ contract VCTRSale is ReentrancyGuard {
         returns (
             uint256 usdcAmount,
             uint256 tdsAmount,
-            uint256 incomeTaxAmount,
-            uint256 surchargeAmount,
-            uint256 cessAmount,
-            uint256 residualAmount,
+            uint256 salesAmount,
             uint64 version
         )
     {
@@ -223,7 +223,7 @@ contract VCTRSale is ReentrancyGuard {
             version += 1;
         }
         usdcAmount = _usdcFor(vctrAmount);
-        (tdsAmount, incomeTaxAmount, surchargeAmount, cessAmount, residualAmount) = _split(usdcAmount, config);
+        (tdsAmount, salesAmount) = _split(usdcAmount, config);
     }
 
     /// @notice Buyer submits an exact, backend-authorized purchase and pays its gas.
@@ -255,8 +255,7 @@ contract VCTRSale is ReentrancyGuard {
         }
         if (accountedInventory < authorization.vctrAmount) revert InventoryInsufficient();
 
-        (uint256 tdsAmount, uint256 incomeTaxAmount, uint256 surchargeAmount, uint256 cessAmount, uint256 residualAmount) =
-            _split(expectedUsdc, activeSplit);
+        (uint256 tdsAmount, uint256 salesAmount) = _split(expectedUsdc, activeSplit);
 
         usedNonces[authorization.nonce] = true;
         usedReferences[authorization.referenceId] = true;
@@ -269,10 +268,7 @@ contract VCTRSale is ReentrancyGuard {
         if (usdc.balanceOf(address(this)) != balanceBefore + expectedUsdc) revert UnexpectedUsdcBalance();
 
         _pay(activeSplit.wallets[0], tdsAmount);
-        _pay(activeSplit.wallets[1], incomeTaxAmount);
-        _pay(activeSplit.wallets[2], surchargeAmount);
-        _pay(activeSplit.wallets[3], cessAmount);
-        _pay(activeSplit.wallets[4], residualAmount);
+        _pay(activeSplit.wallets[1], salesAmount);
         vctr.safeTransfer(msg.sender, authorization.vctrAmount);
 
         emit PurchaseCompleted(
@@ -283,10 +279,7 @@ contract VCTRSale is ReentrancyGuard {
             authorization.nonce,
             splitVersion,
             tdsAmount,
-            incomeTaxAmount,
-            surchargeAmount,
-            cessAmount,
-            residualAmount
+            salesAmount
         );
 
         if (totalSold == MAX_SALE || successfulPurchaseCount == MAX_PURCHASES) {
@@ -297,24 +290,18 @@ contract VCTRSale is ReentrancyGuard {
 
     /// @notice Seller proposes new split wallets/rates, effective no sooner than 30 days later.
     function scheduleSplit(
-        address[5] calldata payoutWallets_,
+        address[2] calldata payoutWallets_,
         uint16 tdsBps_,
-        uint16 incomeTaxBps_,
-        uint16 surchargeBps_,
-        uint16 cessBps_,
         uint64 effectiveAt_
     ) external onlySeller {
         if (closed) revert SaleClosed();
         if (scheduledSplit.exists) revert PendingSplitExists();
         if (effectiveAt_ < block.timestamp + POLICY_NOTICE) revert NoticeTooShort();
         _validateWallets(payoutWallets_);
-        _validateSplit(tdsBps_, incomeTaxBps_, surchargeBps_, cessBps_);
+        _validateTds(tdsBps_);
 
         scheduledSplit.config.wallets = payoutWallets_;
         scheduledSplit.config.tdsBps = tdsBps_;
-        scheduledSplit.config.incomeTaxBps = incomeTaxBps_;
-        scheduledSplit.config.surchargeBps = surchargeBps_;
-        scheduledSplit.config.cessBps = cessBps_;
         scheduledSplit.effectiveAt = effectiveAt_;
         scheduledSplit.exists = true;
         emit SplitScheduled(effectiveAt_, splitVersion + 1);
@@ -339,16 +326,9 @@ contract VCTRSale is ReentrancyGuard {
     function activeSplitConfig()
         external
         view
-        returns (address[5] memory wallets, uint16 tdsBps, uint16 incomeTaxBps, uint16 surchargeBps, uint16 cessBps, uint64 version)
+        returns (address[2] memory wallets, uint16 tdsBps, uint64 version)
     {
-        return (
-            activeSplit.wallets,
-            activeSplit.tdsBps,
-            activeSplit.incomeTaxBps,
-            activeSplit.surchargeBps,
-            activeSplit.cessBps,
-            splitVersion
-        );
+        return (activeSplit.wallets, activeSplit.tdsBps, splitVersion);
     }
 
     function pendingSplitConfig()
@@ -356,11 +336,8 @@ contract VCTRSale is ReentrancyGuard {
         view
         returns (
             bool exists,
-            address[5] memory wallets,
+            address[2] memory wallets,
             uint16 tdsBps,
-            uint16 incomeTaxBps,
-            uint16 surchargeBps,
-            uint16 cessBps,
             uint64 effectiveAt
         )
     {
@@ -369,9 +346,6 @@ contract VCTRSale is ReentrancyGuard {
             pending.exists,
             pending.config.wallets,
             pending.config.tdsBps,
-            pending.config.incomeTaxBps,
-            pending.config.surchargeBps,
-            pending.config.cessBps,
             pending.effectiveAt
         );
     }
@@ -508,28 +482,17 @@ contract VCTRSale is ReentrancyGuard {
         return (vctrAmount / TOKEN_UNIT) * PRICE_USDC_MICRO_PER_VCTR;
     }
 
-    function _split(uint256 gross, SplitConfig memory config)
-        private
-        pure
-        returns (uint256 tds, uint256 incomeTax, uint256 surcharge, uint256 cess, uint256 residual)
-    {
+    function _split(uint256 gross, SplitConfig memory config) private pure returns (uint256 tds, uint256 sales) {
         tds = gross * config.tdsBps / MAX_BPS;
-        incomeTax = gross * config.incomeTaxBps / MAX_BPS;
-        surcharge = incomeTax * config.surchargeBps / MAX_BPS;
-        cess = (incomeTax + surcharge) * config.cessBps / MAX_BPS;
-        residual = gross - tds - incomeTax - surcharge - cess;
+        sales = gross - tds;
     }
 
-    function _validateSplit(uint16 tds, uint16 incomeTax, uint16 surchargeBps, uint16 cessBps) private pure {
-        if (tds > MAX_BPS || incomeTax > MAX_BPS || surchargeBps > MAX_BPS || cessBps > MAX_BPS) {
-            revert InvalidSplit();
-        }
-        uint256 surchargeRate = uint256(incomeTax) * surchargeBps / MAX_BPS;
-        uint256 cessRate = (uint256(incomeTax) + surchargeRate) * cessBps / MAX_BPS;
-        if (uint256(tds) + incomeTax + surchargeRate + cessRate > MAX_BPS) revert InvalidSplit();
+    function _validateTds(uint16 tdsBps) private pure {
+        // Keep both payout legs nonzero for every positive purchase.
+        if (tdsBps >= MAX_BPS) revert InvalidSplit();
     }
 
-    function _validateWallets(address[5] memory wallets) private view {
+    function _validateWallets(address[2] memory wallets) private view {
         for (uint256 i; i < wallets.length; ++i) {
             if (wallets[i] == address(0) || wallets[i] == address(this)) revert InvalidWallets();
             for (uint256 j = i + 1; j < wallets.length; ++j) {
